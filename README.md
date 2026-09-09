@@ -2,6 +2,20 @@
 
 Player Android local, offline e leve para áudio e vídeo armazenados no aparelho. Esta é uma versão beta inicial: não faz downloads, não usa backend e não pede acesso amplo ao armazenamento.
 
+## Download beta
+
+Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
+
+Versão atual: **v0.1.0-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.0-beta/LocalFlow-Player-v0.1.0-beta.apk).
+
+### Organização de versões
+
+- `v0.1.0-beta`, `v0.1.1-beta`, `v0.2.0-beta`: versões de teste, podem ter falhas.
+- `v1.0.0`: primeira versão estável.
+- `v1.0.1`, `v1.1.0` e seguintes: correções e novos recursos estáveis.
+
+Cada release terá o APK, data, lista de mudanças e uma tag Git correspondente. Para instalar, baixe o APK no celular, abra-o no gerenciador de arquivos e permita a instalação para a origem usada.
+
 ## Tecnologias
 
 Kotlin, Jetpack Compose/Material 3, Navigation Compose, Media3 ExoPlayer, `MediaSessionService`, MediaStore, Room, DataStore, Coroutines e StateFlow. O `minSdk` é 26 (Android 8) e o `targetSdk` é 35.
