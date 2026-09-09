@@ -2,7 +2,7 @@
 
 ## Fase atual
 
-Implementação inicial compilada e validada por build local.
+Correções de uso em validação para a beta `0.1.1`.
 
 ## Funcionalidades concluídas
 
@@ -11,6 +11,8 @@ Implementação inicial compilada e validada por build local.
 - Biblioteca com músicas, vídeos, pastas, favoritos, busca local e playlists persistidas.
 - MediaSessionService com uma única instância de ExoPlayer, MediaController, áudio focus e tratamento de headset becoming noisy.
 - Mini player, telas de áudio/vídeo, queue, shuffle/repeat, liberação de Surface no vídeo e configurações persistidas.
+- Playlists agora podem ser abertas, reproduzidas e ter itens removidos; o botão “Lista” em cada mídia adiciona itens à playlist escolhida.
+- Modo somente áudio do vídeo é uma escolha explícita no player; ao sair, a preferência de reprodução em segundo plano define se o áudio continua ou pausa.
 - Teste unitário inicial de transformação de biblioteca.
 
 ## Decisões importantes
@@ -25,7 +27,7 @@ Implementação inicial compilada e validada por build local.
 
 ## Próximos passos
 
-1. Instalar o APK em aparelho real e validar permissões, MediaStore, notificação, lock-screen e Bluetooth.
+1. Compilar e instalar a beta `0.1.1` para validar os ajustes de playlist e vídeo em aparelho real.
 2. Validar a persistência de queue em interrupção real do processo.
 3. Fazer perfil de memória/bateria em aparelho de entrada.
 

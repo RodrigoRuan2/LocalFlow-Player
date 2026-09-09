@@ -6,7 +6,7 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.1.0-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.0-beta/app-debug.apk).
+Versão atual: **v0.1.1-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.1-beta/app-debug.apk).
 
 ### Organização de versões
 
@@ -48,4 +48,4 @@ Em Android 13+, o app solicita `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` e permiss�
 
 ## Limitações conhecidas
 
-O ambiente de criação não dispõe de JDK, Android SDK, Gradle ou ADB instalados/detectáveis, portanto a compilação e o teste em dispositivo precisam ser executados após provisionar essas ferramentas. O projeto usa dependências estáveis declaradas no catálogo de versões.
+Esta é uma beta: recomenda-se validar a reprodução de formatos variados, Bluetooth e lock screen no aparelho real. O projeto usa dependências estáveis declaradas no catálogo de versões.
