@@ -1,0 +1,18 @@
+# Gradle / Android Studio
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Local build diagnostics
+*.log
+*.err
+
+# APKs and keystores
+*.apk
+*.aab
+*.jks
+*.keystore
