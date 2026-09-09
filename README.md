@@ -6,7 +6,15 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.1.1-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.1-beta/app-debug.apk).
+Versão atual: **v0.2.0-beta — Midnight** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.2.0-beta/LocalFlow-Player-v0.2.0-beta.apk).
+
+## Midnight
+
+Interface escura em grafite e violeta, com alternativas clara e sistema. Início, músicas, álbuns, artistas, vídeos, pastas, favoritos, busca, playlists, player completo, fila editável e configurações usam o mesmo tema.
+
+Capas vêm do MediaStore ou dos metadados do arquivo; vídeos usam frames reais. Arquivos sem imagem recebem uma arte vetorial leve. O cache é limitado a 12 MB, as imagens a 128/512 px e a decodificação a duas operações simultâneas. Não buscamos imagens na internet.
+
+Playlists permitem criar, renomear, selecionar várias mídias, abrir, reproduzir e remover itens. O painel de áudio oferece equalizador do Android quando disponível e timer por minutos ou fim da faixa.
 
 ### Organização de versões
 
@@ -29,14 +37,14 @@ Kotlin, Jetpack Compose/Material 3, Navigation Compose, Media3 ExoPlayer, `Media
 ## Como compilar
 
 1. Instale JDK 17 e Android SDK Platform 35 (Android Studio é a maneira mais simples).
-2. Abra a pasta no Android Studio ou execute `gradle assembleDebug` após instalar o Gradle 8.9+.
+2. Abra a pasta no Android Studio ou execute `gradle :app:assembleDebug` com Gradle 8.11.1.
 3. Instale `app/build/outputs/apk/debug/app-debug.apk` no aparelho.
 
 ## Permissões e background
 
-Em Android 13+, o app solicita `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` e permissão de notificação. Em versões anteriores usa `READ_EXTERNAL_STORAGE`. Não usa `MANAGE_EXTERNAL_STORAGE`.
+Em Android 13+, o app solicita `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` e permissão de notificação. Android 14+ também permite seleção parcial de vídeos. Em versões anteriores usa `READ_EXTERNAL_STORAGE`. Não usa `MANAGE_EXTERNAL_STORAGE` nem permissão de internet. `MODIFY_AUDIO_SETTINGS` atende o equalizador; `WAKE_LOCK` é usado pelo gerenciamento de reprodução local do Media3.
 
-`LocalFlowPlaybackService` é um foreground service do tipo `mediaPlayback` e hospeda a `MediaSession`; Media3 disponibiliza notificação, lock screen, headset e Bluetooth automaticamente. Quando o `PlayerView` deixa a tela de vídeo, o Surface é liberado e o ExoPlayer mantém a faixa de áudio do arquivo, sem conversão para MP3.
+`LocalFlowPlaybackService` é um foreground service do tipo `mediaPlayback` e hospeda a `MediaSession`; Media3 disponibiliza notificação, lock screen, headset e Bluetooth. Quando o `PlayerView` deixa a tela, sua conexão ao player é liberada e a faixa de vídeo é desabilitada. A faixa de áudio continua somente conforme a preferência de segundo plano, sem conversão para MP3. O modo somente áudio também pode ser alternado explicitamente no player.
 
 ## Estrutura
 
@@ -48,4 +56,8 @@ Em Android 13+, o app solicita `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO` e permiss�
 
 ## Limitações conhecidas
 
-Esta é uma beta: recomenda-se validar a reprodução de formatos variados, Bluetooth e lock screen no aparelho real. O projeto usa dependências estáveis declaradas no catálogo de versões.
+Esta é uma beta com assinatura de desenvolvimento, não uma distribuição de produção pela Play Store. Formatos dependem dos decodificadores disponíveis no aparelho. Equalizador depende da saída de áudio e pode ficar indisponível. Layout e visibilidade dos controles de tela bloqueada dependem do sistema.
+
+A restauração é pausada e usa checkpoints em transições, pausa e saída do app; uma morte abrupta do processo pode perder segundos recentes. Para limitar o armazenamento, restaura até 500 itens em torno da mídia atual. Bibliotecas muito grandes ainda carregam seus metadados em memória; paginação e medição de bateria/RAM em aparelhos de entrada continuam como trabalho futuro.
+
+Testes: `gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest`. O runner de dispositivo usa Room em memória, sem alterar playlists do usuário: `adb shell am instrument -w com.localflow.player.test/com.localflow.player.LocalFlowTestRunner`. A opção de teste `-e fixtures true` gera arquivos locais de QA nas pastas Music/Movies; não faz parte do APK principal.

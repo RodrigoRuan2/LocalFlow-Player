@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## v0.2.0-beta — Midnight
+
+- Tema Midnight em todas as telas, com grafite, violeta, novos cards e navegação inferior.
+- Capas reais, thumbnails de vídeo, mosaicos de playlists e placeholders leves.
+- Álbuns, artistas e conteúdo de pastas navegáveis; pesquisa local com filtros.
+- Editor de playlists e seleção múltipla de músicas/vídeos, sem duplicar itens existentes.
+- Fila editável com remoção e mudança de ordem, player de áudio e vídeo renovados.
+- Controle explícito de somente áudio e da continuação em segundo plano.
+- Equalizador do Android quando suportado, timer e restauração pausada da última fila.
+- Cache limitado de imagens, permissões parciais de vídeo e testes de regras e persistência.
+
 ## v0.1.1-beta — Playlists e modo de vídeo
 
 - Playlists abrem seus itens, permitem reproduzir a fila e remover uma mídia individualmente.

@@ -15,7 +15,11 @@ data class LocalMedia(
     val durationMs: Long,
     val dateAddedSeconds: Long,
     val sizeBytes: Long,
-    val folder: String
+    val folder: String,
+    val albumId: Long = 0,
+    val artworkUri: Uri? = null
 )
+
+val LocalMedia.key: String get() = "${kind.name}:$id"
 
 data class MediaFolder(val name: String, val count: Int, val representative: LocalMedia)

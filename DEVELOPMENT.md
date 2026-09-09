@@ -1,44 +1,33 @@
 # Desenvolvimento — LocalFlow Player
 
 ## Fase atual
+Beta 0.2.0 Midnight: implementação e testes no emulador concluídos; compilação final passou e APK pronto para distribuição.
 
-Correções de uso em validação para a beta `0.1.1`.
+## Concluído
+- Midnight aplicado em biblioteca, álbuns, artistas, pastas, vídeos, favoritos, playlists, busca, players, fila e configurações.
+- Capas reais, thumbnails, mosaicos e placeholders; cache 12 MB, 128/512 px, até dois decodificadores.
+- Playlists com seleção múltipla, edição e remoção; transações Room preservam ordem e evitam duplicados.
+- Uma instância de ExoPlayer no serviço; controles de vídeo/segundo plano, equalizador opcional, timer e restauração pausada.
 
-## Funcionalidades concluídas
+## Decisões
+- Room para coleções, DataStore para preferências; banco existente preservado.
+- Consultas e imagens fora da main thread; busca com debounce; sem scanner permanente.
+- Restauração por checkpoints, limitada a 500 itens; sem reprodução automática após reinício.
 
-- Projeto Kotlin/Compose com catálogo Gradle, minSdk 26 e permissões modernas.
-- Consulta real de áudio, vídeo e pastas pelo MediaStore em `Dispatchers.IO`.
-- Biblioteca com músicas, vídeos, pastas, favoritos, busca local e playlists persistidas.
-- MediaSessionService com uma única instância de ExoPlayer, MediaController, áudio focus e tratamento de headset becoming noisy.
-- Mini player, telas de áudio/vídeo, queue, shuffle/repeat, liberação de Surface no vídeo e configurações persistidas.
-- Playlists agora podem ser abertas, reproduzidas e ter itens removidos; o botão “Lista” em cada mídia adiciona itens à playlist escolhida.
-- Modo somente áudio do vídeo é uma escolha explícita no player; ao sair, a preferência de reprodução em segundo plano define se o áudio continua ou pausa.
-- Teste unitário inicial de transformação de biblioteca.
+## Validação
+- Build, cinco testes unitários e lint passaram (zero erros, 48 avisos).
+- Compilação final: BUILD SUCCESSFUL em 55 s; assinatura APK validada com apksigner.
+- Android 15/API 35: instalação e reinstalação sem apagar dados, capas/thumbnail, áudio com tela bloqueada, notificação, vídeo normal/somente áudio e pausa quando background desligado.
+- Interface: playlist criada, adição de áudio e vídeo, abertura; favorito, busca, pastas, álbuns, fila reordenada e timer ativado/cancelado.
+- Runner Room em memória: criação, adição, duplicados, remoção, ordem, renomeação, favoritos e exclusão passaram.
+- Sem registros de crash do app na sessão testada. Medição pontual no emulador: aproximadamente 140 MB PSS; não representa teste de bateria ou de aparelho de entrada.
 
-## Decisões importantes
-
-- Room apenas para favoritos/playlists; DataStore para preferências.
-- Não há scanner ou polling de MediaStore: a biblioteca só é consultada ao abrir/atualizar.
-- Thumbnails usam `ContentResolver.loadThumbnail` em 96x96, fora da main thread, com LRU limitado a 8 MB e placeholder para arquivos sem imagem/API antiga.
-
-## Problemas encontrados
-
-- A primeira compilação revelou incompatibilidade de alvo JVM (Java 8 vs. Kotlin/KSP 17) e imports Compose ausentes; foram corrigidos configurando Java/Kotlin 17 e os imports adequados.
+## Problemas e limites
+- Daemon Kotlin instável: compilação in-process com dois workers.
+- Gerador de mídia de teste corrigido para atoms MP4 de 64 bits e pastas permitidas pelo MediaStore.
+- Equalizador indisponível na saída do emulador: estado informativo conferido; efeito audível ainda requer celular.
+- Biblioteca ainda mantém metadados completos em RAM; falta paginação para acervos muito grandes.
 
 ## Próximos passos
-
-1. Compilar e instalar a beta `0.1.1` para validar os ajustes de playlist e vídeo em aparelho real.
-2. Validar a persistência de queue em interrupção real do processo.
-3. Fazer perfil de memória/bateria em aparelho de entrada.
-
-## Validação mais recente
-
-- JDK 17, Gradle 8.11.1 e Android SDK Platform 35 foram provisionados após autorização do usuário.
-- `test assembleDebug`: **BUILD SUCCESSFUL** (53 s; 72 tarefas, 12 executadas).
-- APK: `app/build/outputs/apk/debug/app-debug.apk`.
-
-## Atualização visual
-
-- Interface atualizada com navegação inferior, cards de mídia, mini player e player completo refinados.
-- Ícone moderno do LocalFlow aplicado ao manifesto em `res/drawable/localflow_app_icon.png`.
-- `:app:assembleDebug`: **BUILD SUCCESSFUL** (57 s; APK atualizado instalado e iniciado no emulador Android 15).
+- Testar esta beta no celular: Bluetooth, chamadas, formatos variados, orientação e consumo prolongado.
+- Perfil de memória/bateria em aparelho de entrada e testes adicionais de permissões revogadas/arquivos corrompidos.

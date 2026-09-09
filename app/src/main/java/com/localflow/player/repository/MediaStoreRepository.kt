@@ -1,32 +1,47 @@
 package com.localflow.player.repository
 
-import android.content.ContentResolver
+import android.Manifest
+import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import com.localflow.player.model.LocalMedia
-import com.localflow.player.model.MediaFolder
-import com.localflow.player.model.MediaKind
-import com.localflow.player.model.MediaSort
+import com.localflow.player.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class MediaStoreRepository(context: Context) {
-    private val resolver: ContentResolver = context.contentResolver
-    suspend fun audio(sort: MediaSort = MediaSort.TITLE): List<LocalMedia> = query(MediaKind.AUDIO, sort)
-    suspend fun videos(sort: MediaSort = MediaSort.TITLE): List<LocalMedia> = query(MediaKind.VIDEO, sort)
-    fun foldersFrom(items: List<LocalMedia>): List<MediaFolder> = items.groupBy { it.folder }.map { (name, files) -> MediaFolder(name, files.size, files.first()) }.sortedBy { it.name.lowercase() }
+    private val context = context.applicationContext
+    private val resolver = context.contentResolver
+    suspend fun audio(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.AUDIO, sort)
+    suspend fun videos(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.VIDEO, sort)
+    fun foldersFrom(items: List<LocalMedia>) = items.groupBy { it.folder }.map { (path, media) -> MediaFolder(path, media.size, media.first()) }.sortedBy { it.name.lowercase() }
+
     private suspend fun query(kind: MediaKind, sort: MediaSort): List<LocalMedia> = withContext(Dispatchers.IO) {
+        val permission = if (Build.VERSION.SDK_INT >= 33) { if (kind == MediaKind.AUDIO) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_MEDIA_VIDEO } else Manifest.permission.READ_EXTERNAL_STORAGE
+        val selectedVideos = kind==MediaKind.VIDEO && Build.VERSION.SDK_INT>=34 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)==PackageManager.PERMISSION_GRANTED
+        if (context.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED && !selectedVideos) return@withContext emptyList()
         val collection = if (kind == MediaKind.AUDIO) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        val pathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA
-        val projection = if (kind == MediaKind.AUDIO) arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.DURATION, MediaStore.MediaColumns.DATE_ADDED, MediaStore.MediaColumns.SIZE, pathColumn, MediaStore.Audio.AudioColumns.ARTIST, MediaStore.Audio.AudioColumns.ALBUM) else arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.DURATION, MediaStore.MediaColumns.DATE_ADDED, MediaStore.MediaColumns.SIZE, pathColumn)
-        val order = when (sort) { MediaSort.TITLE -> "${MediaStore.MediaColumns.DISPLAY_NAME} COLLATE NOCASE"; MediaSort.ARTIST -> "${MediaStore.Audio.AudioColumns.ARTIST} COLLATE NOCASE"; MediaSort.DATE_ADDED -> "${MediaStore.MediaColumns.DATE_ADDED} DESC"; MediaSort.DURATION -> "${MediaStore.MediaColumns.DURATION} DESC" }
+        val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.MediaColumns.RELATIVE_PATH else MediaStore.MediaColumns.DATA
+        val projection = mutableListOf("_id", "_display_name", "title", "duration", "date_added", "_size", pathColumn)
+        if (kind == MediaKind.AUDIO) projection.addAll(listOf("artist", "album", "album_id"))
+        val order = when(sort) { MediaSort.TITLE -> "title COLLATE NOCASE"; MediaSort.ARTIST -> if(kind == MediaKind.AUDIO) "artist COLLATE NOCASE" else "title COLLATE NOCASE"; MediaSort.DATE_ADDED -> "date_added DESC"; MediaSort.DURATION -> "duration DESC" }
         val result = ArrayList<LocalMedia>()
-        resolver.query(collection, projection, if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "${MediaStore.MediaColumns.IS_PENDING}=0" else null, null, order)?.use { c ->
-            val id = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID); val name = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME); val duration = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION); val added = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED); val size = c.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE); val path = c.getColumnIndexOrThrow(pathColumn); val artist = c.getColumnIndex(MediaStore.Audio.AudioColumns.ARTIST); val album = c.getColumnIndex(MediaStore.Audio.AudioColumns.ALBUM)
-            while (c.moveToNext()) { val fileName = c.getString(name).orEmpty(); if (c.getLong(duration) > 0) result += LocalMedia(c.getLong(id), android.content.ContentUris.withAppendedId(collection, c.getLong(id)), kind, fileName.substringBeforeLast('.', fileName), c.getStringOrNull(artist) ?: "Artista desconhecido", c.getStringOrNull(album), c.getLong(duration), c.getLong(added), c.getLong(size), c.getString(path)?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { "Armazenamento" } ?: "Armazenamento") }
+        resolver.query(collection, projection.toTypedArray(), if (Build.VERSION.SDK_INT >= 29) "is_pending=0" else null, null, order)?.use { c ->
+            fun str(name: String): String? { val i=c.getColumnIndex(name); return if(i<0 || c.isNull(i)) null else c.getString(i)?.takeUnless { it.isBlank() || it=="<unknown>" } }
+            fun num(name: String): Long { val i=c.getColumnIndex(name); return if(i<0 || c.isNull(i)) 0 else c.getLong(i) }
+            while(c.moveToNext()) {
+                val id=num("_id"); val duration=num("duration"); if(id<=0 || duration<=0) continue
+                val uri=ContentUris.withAppendedId(collection,id)
+                val file=str("_display_name") ?: "Arquivo $id"
+                val path=str(pathColumn).orEmpty()
+                val folder=if(Build.VERSION.SDK_INT>=29) path.trimEnd('/') else path.substringBeforeLast('/', "Armazenamento")
+                val albumId=num("album_id")
+                result += LocalMedia(id,uri,kind,str("title") ?: file.substringBeforeLast('.',file),str("artist") ?: "Artista desconhecido",str("album"),duration,num("date_added"),num("_size"),folder.ifBlank { "Armazenamento" },albumId,
+                    if(kind==MediaKind.VIDEO) uri else if(albumId>0) ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"),albumId) else null)
+            }
         }
         result
     }
-    private fun android.database.Cursor.getStringOrNull(index: Int): String? = if (index >= 0 && !isNull(index)) getString(index)?.takeUnless { it == "<unknown>" } else null
 }
