@@ -6,7 +6,7 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.1.0-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.0-beta/LocalFlow-Player-v0.1.0-beta.apk).
+Versão atual: **v0.1.0-beta** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.1.0-beta/app-debug.apk).
 
 ### Organização de versões
 
