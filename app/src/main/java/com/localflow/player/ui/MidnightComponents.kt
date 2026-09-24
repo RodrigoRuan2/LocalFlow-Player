@@ -2,6 +2,8 @@ package com.localflow.player.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -79,6 +81,54 @@ import com.localflow.player.model.*
                 DropdownMenuItem(text={ Text(if(favorite) "Remover dos favoritos" else "Favoritar") },leadingIcon={ Icon(Icons.Default.FavoriteBorder,null) },onClick={ menu=false; toggleFavorite() })
             }
         }
+    }
+}
+@Composable fun MediaSelectionBar(
+    selecting: Boolean,
+    selected: List<LocalMedia>,
+    allItems: List<LocalMedia>,
+    folderSuggestions: List<String>,
+    selectAll: ()->Unit,
+    close: ()->Unit,
+    delete: (List<LocalMedia>)->Unit,
+    move: (List<LocalMedia>,String)->Unit
+) {
+    if(!selecting) return
+    var confirmDelete by remember { mutableStateOf(false) }
+    var showMove by remember { mutableStateOf(false) }
+    Surface(Modifier.fillMaxWidth(),color=MaterialTheme.colorScheme.secondaryContainer) {
+        Row(Modifier.padding(horizontal=12.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
+            Text(selected.size.toString()+" selecionados",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+            IconButton(selectAll,enabled=allItems.isNotEmpty()) { Icon(Icons.Default.SelectAll,"Selecionar todos") }
+            IconButton({ showMove=true },enabled=selected.isNotEmpty()) { Icon(Icons.Default.DriveFileMove,"Mover selecionados") }
+            IconButton({ confirmDelete=true },enabled=selected.isNotEmpty()) { Icon(Icons.Default.DeleteOutline,"Apagar do dispositivo") }
+            IconButton(close) { Icon(Icons.Default.Close,"Cancelar seleção") }
+        }
+    }
+    if(confirmDelete) AlertDialog(
+        onDismissRequest={ confirmDelete=false },
+        title={ Text("Apagar do dispositivo?") },
+        text={ Text("${selected.size} arquivo(s) serão apagados do celular. Playlists mantêm apenas referências aos arquivos e poderão mostrar itens indisponíveis.") },
+        confirmButton={ TextButton({ confirmDelete=false; delete(selected); close() }) { Text("Apagar") } },
+        dismissButton={ TextButton({ confirmDelete=false }) { Text("Cancelar") } }
+    )
+    if(showMove) {
+        var destination by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest={ showMove=false },
+            title={ Text("Mover ${selected.size} arquivo(s)") },
+            text={ Column {
+                Text("Informe a pasta de destino. Áudios vão para Música e vídeos para Vídeos; o Android pedirá confirmação.",style=MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(destination,{ destination=it.take(80) },Modifier.fillMaxWidth(),label={ Text("Nome da pasta") },singleLine=true)
+                if(folderSuggestions.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp)); Text("Pastas existentes",style=MaterialTheme.typography.labelSmall)
+                    LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) { items(folderSuggestions.take(8),key={ it }) { name -> FilterChip(destination==name,{ destination=name },label={ Text(name) }) } }
+                }
+            } },
+            confirmButton={ TextButton({ showMove=false; move(selected,destination); close() },enabled=destination.isNotBlank()) { Text("Mover") } },
+            dismissButton={ TextButton({ showMove=false }) { Text("Cancelar") } }
+        )
     }
 }
 @Composable fun PreferenceRow(title: String,description: String,checked: Boolean,change: (Boolean)->Unit) {

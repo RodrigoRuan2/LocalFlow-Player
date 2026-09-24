@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## v0.3.0-beta — Organização de arquivos
+
+- Listas retornam ao primeiro item ao mudar abas, filtros ou ordenação.
+- Modo de seleção múltipla em músicas, WhatsApp, vídeos, favoritos e coleções.
+- Arquivos selecionados podem ser movidos para uma pasta nova ou apagados do dispositivo após confirmação do Android.
+- Pastas mostram totais separados de músicas, áudios WhatsApp e vídeos; ao abrir, permitem filtrar esses tipos.
+- Remover em playlist continua removendo somente a referência, sem apagar o arquivo do celular.
+
 ## v0.2.1-beta — Biblioteca organizada
 
 - Áudios localizados em pastas do WhatsApp agora ficam na aba própria **WhatsApp**, fora de **Faixas**.

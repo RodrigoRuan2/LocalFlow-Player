@@ -2,6 +2,7 @@ package com.localflow.player.repository
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -16,7 +17,29 @@ class MediaStoreRepository(context: Context) {
     private val resolver = context.contentResolver
     suspend fun audio(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.AUDIO, sort)
     suspend fun videos(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.VIDEO, sort)
-    fun foldersFrom(items: List<LocalMedia>) = items.groupBy { it.folder }.map { (path, media) -> MediaFolder(path, media.size, media.first()) }.sortedBy { it.name.lowercase() }
+    fun foldersFrom(items: List<LocalMedia>) = items.groupBy { it.folder }.map { (path, media) ->
+        MediaFolder(
+            name=path,
+            count=media.size,
+            representative=media.first(),
+            musicCount=media.count { it.kind==MediaKind.AUDIO && !it.isWhatsAppAudio() },
+            whatsAppCount=media.count { it.isWhatsAppAudio() },
+            videoCount=media.count { it.kind==MediaKind.VIDEO }
+        )
+    }.sortedBy { it.name.lowercase() }
+
+    /** Called only after the Android write-consent dialog has approved these exact URIs. */
+    suspend fun moveToManagedFolder(items: List<LocalMedia>, destinationName: String): Int = withContext(Dispatchers.IO) {
+        val safeName=destinationName.trim().replace(Regex("[\\\\/:*?\"<>|]"),"-").take(80).trim('.',' ')
+        require(safeName.isNotBlank()) { "Escolha um nome de pasta válido." }
+        var moved=0
+        items.forEach { item ->
+            val relative=if(item.kind==MediaKind.AUDIO) "Music/$safeName/" else "Movies/$safeName/"
+            val values=ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH,relative) }
+            if(resolver.update(item.uri,values,null,null)>0) moved++
+        }
+        moved
+    }
 
     private suspend fun query(kind: MediaKind, sort: MediaSort): List<LocalMedia> = withContext(Dispatchers.IO) {
         val permission = if (Build.VERSION.SDK_INT >= 33) { if (kind == MediaKind.AUDIO) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_MEDIA_VIDEO } else Manifest.permission.READ_EXTERNAL_STORAGE

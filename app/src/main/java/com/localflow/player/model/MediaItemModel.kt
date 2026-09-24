@@ -30,4 +30,17 @@ fun isWhatsAppAudioFolder(folder: String): Boolean = normalized(folder)
 
 fun LocalMedia.isWhatsAppAudio(): Boolean = kind == MediaKind.AUDIO && isWhatsAppAudioFolder(folder)
 
-data class MediaFolder(val name: String, val count: Int, val representative: LocalMedia)
+data class MediaFolder(
+    val name: String,
+    val count: Int,
+    val representative: LocalMedia,
+    val musicCount: Int = 0,
+    val whatsAppCount: Int = 0,
+    val videoCount: Int = 0
+)
+
+sealed interface MediaFileOperation {
+    val items: List<LocalMedia>
+    data class Delete(override val items: List<LocalMedia>) : MediaFileOperation
+    data class Move(override val items: List<LocalMedia>, val destinationName: String) : MediaFileOperation
+}

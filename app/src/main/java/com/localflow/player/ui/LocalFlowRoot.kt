@@ -1,11 +1,15 @@
 package com.localflow.player.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -43,7 +47,18 @@ import com.localflow.player.playback.PlayerConnection
     var permissionVersion by remember { mutableIntStateOf(0) }
     var skipPermission by rememberSaveable { mutableStateOf(false) }
     var adding by remember { mutableStateOf<LocalMedia?>(null) }
+    var pendingFileOperation by remember { mutableStateOf<MediaFileOperation?>(null) }
     val launcher=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissionVersion++; vm.refresh() }
+    val fileOperationLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val operation=pendingFileOperation
+        pendingFileOperation=null
+        if(operation==null) return@rememberLauncherForActivityResult
+        if(result.resultCode!=Activity.RESULT_OK) vm.cancelFileOperation()
+        else when(operation) {
+            is MediaFileOperation.Delete -> vm.completeDelete(operation)
+            is MediaFileOperation.Move -> vm.completeMove(operation)
+        }
+    }
     val granted=remember(permissionVersion) { permissions.filterNot { it=="android.permission.POST_NOTIFICATIONS" }.any { context.checkSelfPermission(it)==PackageManager.PERMISSION_GRANTED } }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -54,6 +69,20 @@ import com.localflow.player.playback.PlayerConnection
         lifecycle.addObserver(observer); onDispose { lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(vm) { vm.fileOperations.collect { operation ->
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.R) { vm.fileOperationUnavailable() }
+        else {
+            val sender=runCatching {
+                val uris=operation.items.map { it.uri }
+                when(operation) {
+                    is MediaFileOperation.Delete -> MediaStore.createDeleteRequest(context.contentResolver,uris).intentSender
+                    is MediaFileOperation.Move -> MediaStore.createWriteRequest(context.contentResolver,uris).intentSender
+                }
+            }.getOrNull()
+            if(sender==null) vm.cancelFileOperation()
+            else { pendingFileOperation=operation; fileOperationLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
+        }
+    } }
     LaunchedEffect(player) { player.options.collect { value -> value.error?.let { snackbar.showSnackbar(it,actionLabel="Fechar"); player.clearError() } } }
     fun open(path: String) { nav.navigate(path) { launchSingleTop=true } }
     fun back() { nav.popBackStack() }
@@ -85,14 +114,14 @@ import com.localflow.player.playback.PlayerConnection
             }) { padding ->
                 NavHost(nav,"home",Modifier.padding(padding)) {
                     composable("home") { HomePage(library,collections,favoriteKeys,player,::open,::play,{ adding=it },vm::toggleFavorite) }
-                    composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,{ adding=it }) }
-                    composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,sort=library.videoSort,order={ vm.order(LibrarySection.VIDEO,it) }) }
+                    composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,{ adding=it },vm::requestDelete,vm::requestMove) }
+                    composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,library.folders,vm::requestDelete,vm::requestMove,sort=library.videoSort,order={ vm.order(LibrarySection.VIDEO,it) }) }
                     composable("folders") { FoldersPage(library.folders) { group("folder",it) } }
                     composable("group/{type}/{id}") { e ->
                         val type=e.arguments?.getString("type").orEmpty(); val id=e.arguments?.getString("id").orEmpty()
                         val items=remember(library,type,id) { library.all.filter { when(type) { "folder"->it.folder==id; "artist"->it.artist==id; else->albumKey(it)==id } } }
                         val title=when(type) { "folder"->id.substringAfterLast('/'); "artist"->id; else->items.firstOrNull()?.album ?: "Álbum desconhecido" }
-                        CollectionPage(title,items,if(type=="folder") id else items.firstOrNull()?.artist.orEmpty(),favoriteKeys,::back,::play,{ adding=it },vm::toggleFavorite)
+                        CollectionPage(title,items,if(type=="folder") id else items.firstOrNull()?.artist.orEmpty(),favoriteKeys,::back,::play,{ adding=it },vm::toggleFavorite,library.folders,vm::requestDelete,vm::requestMove,type=="folder")
                     }
                     composable("playlists") { PlaylistsPage(collections,{ open("edit/0") },{ open("playlist/"+it) }) }
                     composable("playlist/{id}") { e ->
@@ -110,7 +139,7 @@ import com.localflow.player.playback.PlayerConnection
                         val id=e.arguments?.getString("id")?.toLongOrNull() ?: 0
                         AddMediaPage(playlists.find { it.id==id }?.name.orEmpty(),library.all,::back) { items -> vm.addToPlaylist(id,items) { back() } }
                     }
-                    composable("favorites") { MediaListPage("Favoritos",library.all.filter { it.key in favoriteKeys },library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,::back) }
+                    composable("favorites") { MediaListPage("Favoritos",library.all.filter { it.key in favoriteKeys },library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,library.folders,vm::requestDelete,vm::requestMove,::back) }
                     composable("search") { SearchPage(vm,favoriteKeys,::back,::group,::play,{ adding=it }) }
                     composable("audio") { AudioPage(player,library.all,favoriteKeys,vm::toggleFavorite,::back,{ open("queue") },{ open("sound") }) }
                     composable("video") { VideoPage(player,settings.videoAudioBackground,vm::setVideoAudioBackground,::back,{ open("sound") }) }

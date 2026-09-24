@@ -34,6 +34,8 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
     private var refreshJob: Job? = null
     private val notices = Channel<String>(Channel.BUFFERED)
     val messages = notices.receiveAsFlow()
+    private val pendingFileOperations=Channel<MediaFileOperation>(Channel.BUFFERED)
+    val fileOperations=pendingFileOperations.receiveAsFlow()
     val settings = app.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
     val state = combine(content,settings,sorts) { library,preferences,currentSorts ->
         val visibleAudio=library.songs.filter { !preferences.hideShort || it.durationMs>=10_000 }
@@ -71,6 +73,24 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
     }
     fun order(section: LibrarySection,value: MediaSort) { sorts.update { it + (section to value) } }
     fun play(item: LocalMedia, source: List<LocalMedia>) = app.player.play(source,source.indexOf(item).coerceAtLeast(0))
+    fun requestDelete(items: List<LocalMedia>) { if(items.isNotEmpty()) viewModelScope.launch { pendingFileOperations.send(MediaFileOperation.Delete(items.distinctBy { it.key })) } }
+    fun requestMove(items: List<LocalMedia>,destinationName: String) {
+        if(items.isEmpty()) return
+        if(destinationName.isBlank()) { viewModelScope.launch { notices.send("Informe um nome para a pasta de destino.") }; return }
+        viewModelScope.launch { pendingFileOperations.send(MediaFileOperation.Move(items.distinctBy { it.key },destinationName)) }
+    }
+    fun completeDelete(operation: MediaFileOperation.Delete) = viewModelScope.launch {
+        notices.send(operation.items.size.toString()+" arquivo(s) apagado(s) do dispositivo.")
+        refresh()
+    }
+    fun completeMove(operation: MediaFileOperation.Move) = action {
+        val moved=app.mediaRepository.moveToManagedFolder(operation.items,operation.destinationName)
+        if(moved==0) notices.send("Nenhum arquivo foi movido. Confira o acesso concedido.")
+        else notices.send(moved.toString()+" arquivo(s) movido(s) para "+operation.destinationName+".")
+        refresh()
+    }
+    fun cancelFileOperation() = viewModelScope.launch { notices.send("Operação cancelada.") }
+    fun fileOperationUnavailable() = viewModelScope.launch { notices.send("Mover e apagar arquivos requer Android 11 ou superior.") }
     private fun action(block: suspend () -> Unit) = viewModelScope.launch {
         try { block() } catch(e: CancellationException) { throw e }
         catch(e: Exception) { notices.send("Não foi possível salvar. Tente novamente.") }
