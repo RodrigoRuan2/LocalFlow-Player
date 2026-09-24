@@ -4,6 +4,7 @@ import android.net.Uri
 
 enum class MediaKind { AUDIO, VIDEO }
 enum class MediaSort { TITLE, ARTIST, DATE_ADDED, DURATION }
+enum class LibrarySection { MUSIC, WHATSAPP_AUDIO, VIDEO }
 
 data class LocalMedia(
     val id: Long,
@@ -21,5 +22,12 @@ data class LocalMedia(
 )
 
 val LocalMedia.key: String get() = "${kind.name}:$id"
+
+/** WhatsApp locations vary by Android version and by the Business edition. */
+fun isWhatsAppAudioFolder(folder: String): Boolean = normalized(folder)
+    .replace('\\', '/')
+    .contains("whatsapp")
+
+fun LocalMedia.isWhatsAppAudio(): Boolean = kind == MediaKind.AUDIO && isWhatsAppAudioFolder(folder)
 
 data class MediaFolder(val name: String, val count: Int, val representative: LocalMedia)

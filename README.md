@@ -6,7 +6,7 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.2.0-beta — Midnight** — [baixar APK](https://github.com/RodrigoRuan2/LocalFlow-Player/releases/download/v0.2.0-beta/LocalFlow-Player-v0.2.0-beta.apk).
+Versão atual: **v0.2.1-beta — Biblioteca organizada** — o APK estará disponível na página de [Releases](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
 ## Midnight
 
@@ -15,6 +15,8 @@ Interface escura em grafite e violeta, com alternativas clara e sistema. Início
 Capas vêm do MediaStore ou dos metadados do arquivo; vídeos usam frames reais. Arquivos sem imagem recebem uma arte vetorial leve. O cache é limitado a 12 MB, as imagens a 128/512 px e a decodificação a duas operações simultâneas. Não buscamos imagens na internet.
 
 Playlists permitem criar, renomear, selecionar várias mídias, abrir, reproduzir e remover itens. O painel de áudio oferece equalizador do Android quando disponível e timer por minutos ou fim da faixa.
+
+Áudios cujo caminho no MediaStore pertence ao WhatsApp são mostrados na aba **WhatsApp** dentro de Músicas, sem aparecer em Faixas. Músicas, WhatsApp e Vídeos guardam ordenações independentes.
 
 ### Organização de versões
 

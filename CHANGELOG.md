@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## v0.2.1-beta — Biblioteca organizada
+
+- Áudios localizados em pastas do WhatsApp agora ficam na aba própria **WhatsApp**, fora de **Faixas**.
+- A detecção cobre os caminhos antigos e atuais do WhatsApp, incluindo `Android/media` e WhatsApp Business.
+- Músicas, áudios do WhatsApp e vídeos ganharam ordenações independentes.
+- A tela de vídeos agora tem botão de ordenar por nome, artista, data adicionada ou duração.
+
 ## v0.2.0-beta — Midnight
 
 - Tema Midnight em todas as telas, com grafite, violeta, novos cards e navegação inferior.

@@ -86,7 +86,7 @@ import com.localflow.player.playback.PlayerConnection
                 NavHost(nav,"home",Modifier.padding(padding)) {
                     composable("home") { HomePage(library,collections,favoriteKeys,player,::open,::play,{ adding=it },vm::toggleFavorite) }
                     composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,{ adding=it }) }
-                    composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite) }
+                    composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,sort=library.videoSort,order={ vm.order(LibrarySection.VIDEO,it) }) }
                     composable("folders") { FoldersPage(library.folders) { group("folder",it) } }
                     composable("group/{type}/{id}") { e ->
                         val type=e.arguments?.getString("type").orEmpty(); val id=e.arguments?.getString("id").orEmpty()

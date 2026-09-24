@@ -1,13 +1,14 @@
 # Desenvolvimento — LocalFlow Player
 
 ## Fase atual
-Beta 0.2.0 Midnight: implementação e testes no emulador concluídos; compilação final passou e APK pronto para distribuição.
+Beta 0.2.1: separação de áudio do WhatsApp e ordenação independente compiladas; lint e publicação em preparação.
 
 ## Concluído
 - Midnight aplicado em biblioteca, álbuns, artistas, pastas, vídeos, favoritos, playlists, busca, players, fila e configurações.
 - Capas reais, thumbnails, mosaicos e placeholders; cache 12 MB, 128/512 px, até dois decodificadores.
 - Playlists com seleção múltipla, edição e remoção; transações Room preservam ordem e evitam duplicados.
 - Uma instância de ExoPlayer no serviço; controles de vídeo/segundo plano, equalizador opcional, timer e restauração pausada.
+- Aba WhatsApp separada de Faixas; filtros de música, WhatsApp e vídeo não compartilham mais estado.
 
 ## Decisões
 - Room para coleções, DataStore para preferências; banco existente preservado.
@@ -17,6 +18,7 @@ Beta 0.2.0 Midnight: implementação e testes no emulador concluídos; compilaç
 ## Validação
 - Build, cinco testes unitários e lint passaram (zero erros, 48 avisos).
 - Compilação final: BUILD SUCCESSFUL em 55 s; assinatura APK validada com apksigner.
+- `assembleDebug` e seis testes unitários passaram após a separação de biblioteca (4 min 28 s).
 - Android 15/API 35: instalação e reinstalação sem apagar dados, capas/thumbnail, áudio com tela bloqueada, notificação, vídeo normal/somente áudio e pausa quando background desligado.
 - Interface: playlist criada, adição de áudio e vídeo, abertura; favorito, busca, pastas, álbuns, fila reordenada e timer ativado/cancelado.
 - Runner Room em memória: criação, adição, duplicados, remoção, ordem, renomeação, favoritos e exclusão passaram.
@@ -30,4 +32,5 @@ Beta 0.2.0 Midnight: implementação e testes no emulador concluídos; compilaç
 
 ## Próximos passos
 - Testar esta beta no celular: Bluetooth, chamadas, formatos variados, orientação e consumo prolongado.
+- Testar em aparelho com áudios WhatsApp: confirmar caminhos antigos/novos e a independência das três ordenações.
 - Perfil de memória/bateria em aparelho de entrada e testes adicionais de permissões revogadas/arquivos corrompidos.

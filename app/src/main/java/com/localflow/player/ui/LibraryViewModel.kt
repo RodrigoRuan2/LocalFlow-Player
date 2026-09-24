@@ -8,23 +8,39 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 
-data class LibraryState(val songs: List<LocalMedia> = emptyList(), val videos: List<LocalMedia> = emptyList(), val folders: List<MediaFolder> = emptyList(), val loading: Boolean = true, val error: String? = null, val sort: MediaSort = MediaSort.TITLE) {
-    val all: List<LocalMedia> get() = songs + videos
+data class LibraryState(
+    val songs: List<LocalMedia> = emptyList(),
+    val whatsAppAudio: List<LocalMedia> = emptyList(),
+    val videos: List<LocalMedia> = emptyList(),
+    val folders: List<MediaFolder> = emptyList(),
+    val loading: Boolean = true,
+    val error: String? = null,
+    val songSort: MediaSort = MediaSort.TITLE,
+    val whatsAppSort: MediaSort = MediaSort.DATE_ADDED,
+    val videoSort: MediaSort = MediaSort.DATE_ADDED
+) {
+    val all: List<LocalMedia> get() = songs + whatsAppAudio + videos
 }
 data class PlaylistDetail(val playlist: PlaylistEntity, val items: List<LocalMedia>, val missing: Int = 0)
 @OptIn(FlowPreview::class)
 class LibraryViewModel(private val app: AppContainer) : ViewModel() {
     private val dao = app.database.libraryDao()
     private val content = MutableStateFlow(LibraryState())
-    private val sort = MutableStateFlow(MediaSort.TITLE)
+    private val sorts = MutableStateFlow(mapOf(
+        LibrarySection.MUSIC to MediaSort.TITLE,
+        LibrarySection.WHATSAPP_AUDIO to MediaSort.DATE_ADDED,
+        LibrarySection.VIDEO to MediaSort.DATE_ADDED
+    ))
     private var refreshJob: Job? = null
     private val notices = Channel<String>(Channel.BUFFERED)
     val messages = notices.receiveAsFlow()
     val settings = app.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
-    val state = combine(content,settings,sort) { library,preferences,order ->
-        val audio=library.songs.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(order)
-        val video=library.videos.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(order)
-        library.copy(songs=audio,videos=video,folders=app.mediaRepository.foldersFrom(audio+video),sort=order)
+    val state = combine(content,settings,sorts) { library,preferences,currentSorts ->
+        val visibleAudio=library.songs.filter { !preferences.hideShort || it.durationMs>=10_000 }
+        val music=visibleAudio.filterNot { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.MUSIC))
+        val whatsapp=visibleAudio.filter { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO))
+        val video=library.videos.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(currentSorts.getValue(LibrarySection.VIDEO))
+        library.copy(songs=music,whatsAppAudio=whatsapp,videos=video,folders=app.mediaRepository.foldersFrom(music+whatsapp+video),songSort=currentSorts.getValue(LibrarySection.MUSIC),whatsAppSort=currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO),videoSort=currentSorts.getValue(LibrarySection.VIDEO))
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),LibraryState())
     val favorites=dao.favorites().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val playlists=dao.playlists().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
@@ -41,20 +57,19 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
     val searchResults=combine(query.debounce(220),state) { q,s -> s.all.matching(q) }
         .flowOn(Dispatchers.Default).stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     init { refresh() }
-    fun refresh(sort: MediaSort = this.sort.value) {
-        this.sort.value=sort
+    fun refresh() {
         if(refreshJob?.isActive==true) return
         refreshJob=viewModelScope.launch {
             content.value=content.value.copy(loading=true,error=null)
             try {
                 val a=app.mediaRepository.audio()
                 val v=app.mediaRepository.videos()
-                content.value=LibraryState(a,v,app.mediaRepository.foldersFrom(a+v),false)
+                content.value=LibraryState(songs=a,videos=v,folders=app.mediaRepository.foldersFrom(a+v),loading=false)
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { content.value=content.value.copy(loading=false,error="Não foi possível ler os arquivos. Confira o acesso à biblioteca.") }
         }
     }
-    fun order(value: MediaSort) { sort.value=value }
+    fun order(section: LibrarySection,value: MediaSort) { sorts.update { it + (section to value) } }
     fun play(item: LocalMedia, source: List<LocalMedia>) = app.player.play(source,source.indexOf(item).coerceAtLeast(0))
     private fun action(block: suspend () -> Unit) = viewModelScope.launch {
         try { block() } catch(e: CancellationException) { throw e }
