@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -61,7 +63,7 @@ import kotlinx.coroutines.delay
     }
 }
 @Composable private fun Transport(player: PlayerConnection,s: PlayerState) {
-    Row(Modifier.fillMaxWidth().padding(vertical=18.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical=10.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
         IconButton({ player.setShuffle(!s.shuffle) }) { Icon(Icons.Default.Shuffle,if(s.shuffle) "Desativar aleatório" else "Ativar aleatório",tint=if(s.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
         IconButton(player::previous) { Icon(Icons.Default.SkipPrevious,"Anterior",Modifier.size(32.dp)) }
         FilledIconButton(player::toggle,Modifier.size(68.dp),enabled=s.mediaId!=null) { Icon(if(s.playing) Icons.Default.Pause else Icons.Default.PlayArrow,if(s.playing) "Pausar" else "Reproduzir",Modifier.size(36.dp)) }
@@ -76,11 +78,15 @@ import kotlinx.coroutines.delay
     val q by player.queue.collectAsStateWithLifecycle()
     val item=remember(s.mediaId,library) { library.find { it.key==s.mediaId } }
     Tick(player)
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        PageHeader("Tocando agora",if(q.isEmpty()) "Selecione uma mídia" else "Sua fila · "+q.size+" arquivos",back)
-        Column(Modifier.padding(start=24.dp,end=24.dp,bottom=20.dp)) {
-            Artwork(s.uri,item?.artworkUri ?: s.artwork,s.title,s.mediaId?.startsWith("VIDEO:")==true,Modifier.fillMaxWidth().aspectRatio(1f),large=true)
-            Spacer(Modifier.height(24.dp))
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val artworkSide=minOf(maxWidth,(maxHeight-410.dp).coerceIn(210.dp,280.dp))
+        Column(Modifier.fillMaxSize()) {
+            PageHeader("Tocando agora",if(q.isEmpty()) "Selecione uma mídia" else "Sua fila · "+q.size+" arquivos",back)
+            Column(Modifier.fillMaxWidth().padding(start=24.dp,end=24.dp,bottom=12.dp)) {
+                Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center) {
+                    Artwork(s.uri,item?.artworkUri ?: s.artwork,s.title,s.mediaId?.startsWith("VIDEO:")==true,Modifier.size(artworkSide),large=true)
+                }
+                Spacer(Modifier.height(16.dp))
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(s.title.ifBlank { "Sua próxima música" },style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
@@ -89,18 +95,19 @@ import kotlinx.coroutines.delay
                 }
                 IconButton({ item?.let(toggle) },enabled=item!=null) { Icon(if(s.mediaId in favorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,"Favoritar",tint=MaterialTheme.colorScheme.primary) }
             }
-            Spacer(Modifier.height(12.dp)); PlaybackProgress(player,s); Transport(player,s)
-            HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth().padding(top=12.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
-                TextButton(queue) { Icon(Icons.AutoMirrored.Filled.QueueMusic,null); Spacer(Modifier.width(5.dp)); Text("Fila") }
-                TextButton(sound) { Icon(Icons.Default.Tune,null); Spacer(Modifier.width(5.dp)); Text("Áudio / timer") }
+                Spacer(Modifier.height(6.dp)); PlaybackProgress(player,s); Transport(player,s)
+                HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(top=6.dp),horizontalArrangement=Arrangement.SpaceEvenly) {
+                    TextButton(queue) { Icon(Icons.AutoMirrored.Filled.QueueMusic,null); Spacer(Modifier.width(5.dp)); Text("Fila") }
+                    TextButton(sound) { Icon(Icons.Default.Tune,null); Spacer(Modifier.width(5.dp)); Text("Áudio / timer") }
+                }
             }
         }
     }
 }
 private fun Context.activity(): Activity? = when(this) { is Activity->this; is ContextWrapper->baseContext.activity(); else->null }
 
-@Composable fun VideoPage(player: PlayerConnection,background: Boolean,setBackground: (Boolean)->Unit,back: ()->Unit,sound: ()->Unit) {
+@Composable fun VideoPage(player: PlayerConnection,background: Boolean,setBackground: (Boolean)->Unit,back: ()->Unit,sound: ()->Unit,queue: ()->Unit) {
     val s by player.state.collectAsStateWithLifecycle()
     val options by player.options.collectAsStateWithLifecycle()
     val p=if(s.connected) player.controllerOrNull() else null
@@ -110,7 +117,7 @@ private fun Context.activity(): Activity? = when(this) { is Activity->this; is C
     var view by remember { mutableStateOf<PlayerView?>(null) }
     val onlyAudio by rememberUpdatedState(options.audioOnly)
     var visible by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
-    var landscape by rememberSaveable { mutableStateOf(false) }
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
     DisposableEffect(p,lifecycle) {
         if(p!=null) player.videoVisible(true)
         val observer=LifecycleEventObserver { _,event ->
@@ -126,12 +133,29 @@ private fun Context.activity(): Activity? = when(this) { is Activity->this; is C
             if(activity?.isChangingConfigurations!=true) player.videoVisible(false)
         }
     }
-    DisposableEffect(activity) {
-        onDispose { if(activity?.isChangingConfigurations!=true) activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    DisposableEffect(activity,fullscreen) {
+        val controller=activity?.window?.let { WindowCompat.getInsetsController(it,it.decorView) }
+        if(fullscreen) {
+            activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+            if(activity?.isChangingConfigurations!=true) activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
     Tick(player)
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        PageHeader("Vídeo",s.title,back,actions={ IconButton({ landscape=!landscape; activity?.requestedOrientation=if(landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }) { Icon(Icons.Default.Fullscreen,"Alternar orientação") } })
+    if(fullscreen) {
+        Box(Modifier.fillMaxSize().then(Modifier)) {
+            if(p!=null && !options.audioOnly) VideoSurface(p,visible,s,view, { view=it },Modifier.fillMaxSize())
+            else Box(Modifier.fillMaxSize(),Alignment.Center) { Text("Vídeo indisponível",color=Color.White) }
+            IconButton({ fullscreen=false },Modifier.align(Alignment.TopEnd).statusBarsPadding()) { Icon(Icons.Default.FullscreenExit,"Sair da tela cheia",tint=Color.White) }
+        }
+    } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        PageHeader("Vídeo",s.title,back,actions={ IconButton({ fullscreen=true },enabled=p!=null && !options.audioOnly) { Icon(Icons.Default.Fullscreen,"Entrar em tela cheia") } })
         if(p!=null && !options.audioOnly) AndroidView(
             factory={ PlayerView(it).apply { this.player=p; useController=false; setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); view=this } },
             modifier=Modifier.fillMaxWidth().aspectRatio(16f/9f),
@@ -154,8 +178,40 @@ private fun Context.activity(): Activity? = when(this) { is Activity->this; is C
             Spacer(Modifier.height(14.dp))
             PreferenceRow("Somente áudio","Desligue a imagem; volte ao vídeo quando quiser.",options.audioOnly,player::audioOnly)
             PreferenceRow("Continuar em segundo plano","Ao sair do vídeo ou bloquear a tela.",background,setBackground)
-            Hint(if(options.audioOnly) "Imagem desligada. A faixa de áudio continua sendo a do vídeo original." else "Vídeo ativo. O modo somente áudio depende da sua escolha.")
+            VideoQueuePreview(player,queue)
             TextButton(sound,Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune,null); Text("Equalizador e temporizador") }
+        }
+    }
+}
+@Composable private fun VideoSurface(player: Player,visible: Boolean,state: PlayerState,currentView: PlayerView?,setView: (PlayerView?)->Unit,modifier: Modifier) {
+    AndroidView(
+        factory={ PlayerView(it).apply { this.player=player; useController=false; setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); setView(this) } },
+        modifier=modifier,
+        onRelease={ it.player=null; if(currentView===it) setView(null) },
+        update={ it.player=if(visible) player else null; it.keepScreenOn=visible && state.playing }
+    )
+}
+@Composable private fun VideoQueuePreview(player: PlayerConnection,openQueue: ()->Unit) {
+    val queue by player.queue.collectAsStateWithLifecycle()
+    val state by player.state.collectAsStateWithLifecycle()
+    val index=queue.indexOfFirst { it.id==state.mediaId }
+    val previous=queue.getOrNull(index-1)
+    val next=queue.getOrNull(index+1)
+    if(queue.isNotEmpty()) {
+        HorizontalDivider(Modifier.padding(top=8.dp),color=MaterialTheme.colorScheme.outlineVariant)
+        Text("Na sua fila",Modifier.padding(top=12.dp),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            QueuePreviewCard("Anterior",previous,{ player.playQueue(it.index) },Modifier.weight(1f))
+            QueuePreviewCard("Próximo",next,{ player.playQueue(it.index) },Modifier.weight(1f))
+        }
+        TextButton(openQueue,Modifier.fillMaxWidth()) { Icon(Icons.AutoMirrored.Filled.QueueMusic,null); Spacer(Modifier.width(6.dp)); Text("Ver fila completa") }
+    }
+}
+@Composable private fun QueuePreviewCard(label: String,item: QueueEntry?,play: (QueueEntry)->Unit,modifier: Modifier) {
+    Surface(modifier.then(if(item!=null) Modifier.clickable { play(item) } else Modifier),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.padding(10.dp)) {
+            Text(label,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+            Text(item?.title ?: "Nenhum",maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodySmall,fontWeight=FontWeight.Medium)
         }
     }
 }

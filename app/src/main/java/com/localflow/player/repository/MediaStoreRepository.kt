@@ -61,7 +61,7 @@ class MediaStoreRepository(context: Context) {
                 val path=str(pathColumn).orEmpty()
                 val folder=if(Build.VERSION.SDK_INT>=29) path.trimEnd('/') else path.substringBeforeLast('/', "Armazenamento")
                 val albumId=num("album_id")
-                result += LocalMedia(id,uri,kind,str("title") ?: file.substringBeforeLast('.',file),str("artist") ?: "Artista desconhecido",str("album"),duration,num("date_added"),num("_size"),folder.ifBlank { "Armazenamento" },albumId,
+                result += LocalMedia(id,uri,kind,mediaDisplayTitle(str("title"),file,kind,id),mediaDisplayArtist(str("artist")),str("album"),duration,num("date_added"),num("_size"),folder.ifBlank { "Armazenamento" },albumId,
                     if(kind==MediaKind.VIDEO) uri else if(albumId>0) ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"),albumId) else null)
             }
         }

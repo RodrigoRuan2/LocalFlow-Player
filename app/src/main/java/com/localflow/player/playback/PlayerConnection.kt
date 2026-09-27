@@ -18,6 +18,7 @@ data class QueueEntry(val id: String,val title: String,val artist: String,val ur
 data class PlaybackOptions(val audioOnly: Boolean=false,val timerEnd: Long=0,val finishTrack: Boolean=false,val eqAvailable: Boolean=false,val eqEnabled: Boolean=false,val bands: List<Int> = emptyList(),val gains: List<Int> = emptyList(),val minGain: Int=-1500,val maxGain: Int=1500,val error: String?=null)
 
 class PlayerConnection(context: Context) : Player.Listener, AutoCloseable {
+    private data class PendingPlayback(val items: List<LocalMedia>,val startIndex: Int,val enableShuffle: Boolean)
     private val appContext=context.applicationContext
     private val executor=ContextCompat.getMainExecutor(appContext)
     private val mutableState=MutableStateFlow(PlayerState())
@@ -27,7 +28,7 @@ class PlayerConnection(context: Context) : Player.Listener, AutoCloseable {
     private val mutableOptions=MutableStateFlow(PlaybackOptions())
     val options=mutableOptions.asStateFlow()
     private var controller: MediaController?=null
-    private var pending: Pair<List<LocalMedia>,Int>?=null
+    private var pending: PendingPlayback?=null
     private var future: ListenableFuture<MediaController>?=null
     init { connect() }
     fun connect() {
@@ -45,20 +46,23 @@ class PlayerConnection(context: Context) : Player.Listener, AutoCloseable {
         connection.addListener({
             runCatching { connection.get() }.onSuccess { p ->
                 controller=p; p.addListener(this); publish(p); publishQueue(p); readOptions(p.sessionExtras)
-                pending?.let { play(it.first,it.second); pending=null }
+                pending?.let { playInternal(it.items,it.startIndex,it.enableShuffle); pending=null }
             }.onFailure { mutableOptions.value=mutableOptions.value.copy(error="Não foi possível conectar ao player. Feche e reabra o aplicativo.") }
         },executor)
     }
-    fun play(items: List<LocalMedia>,startIndex: Int=0) {
+    fun play(items: List<LocalMedia>,startIndex: Int=0) = playInternal(items,startIndex,false)
+    fun playShuffled(items: List<LocalMedia>) = playInternal(items,items.indices.random(),true)
+    private fun playInternal(items: List<LocalMedia>,startIndex: Int,enableShuffle: Boolean) {
         if(items.isEmpty()) return
         val p=controller
-        if(p==null) { pending=items to startIndex; connect(); return }
+        if(p==null) { pending=PendingPlayback(items,startIndex,enableShuffle); connect(); return }
         command(Bundle().apply { putBoolean("visible",items[startIndex.coerceIn(items.indices)].kind==MediaKind.VIDEO); putBoolean("audioOnly",false); putBoolean("clearError",true) })
         p.setMediaItems(items.map { item ->
             MediaItem.Builder().setMediaId(item.key).setUri(item.uri).setMediaMetadata(MediaMetadata.Builder()
                 .setTitle(item.title).setArtist(item.artist).setAlbumTitle(item.album)
                 .setArtworkUri(item.uri).setIsPlayable(true).build()).build()
         },startIndex.coerceIn(items.indices),0)
+        if(enableShuffle) p.shuffleModeEnabled=true
         p.prepare(); p.play()
     }
     fun toggle() { controller?.let { if(it.isPlaying) it.pause() else { if(it.playbackState==Player.STATE_IDLE) it.prepare(); it.play() } } }

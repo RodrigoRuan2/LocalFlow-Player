@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## v0.3.1-beta — Players e pastas adaptáveis
+
+- Abas de Músicas adaptadas para telas estreitas: Faixas, WhatsApp, Álbuns e Artistas não sobrepõem letras; busca foi para o cabeçalho.
+- Botão de aleatório na biblioteca de músicas cria e toca a fila em modo shuffle.
+- Player de áudio adapta o tamanho da capa à altura disponível e mantém todos os controles principais visíveis em telas menores.
+- Tela cheia de vídeo agora entra em modo imersivo real, em paisagem e sem cabeçalho/barras do app; o Android pode exibir seu aviso educativo uma única vez.
+- A tela de vídeo mostra os itens anterior e próximo da fila e abre a fila completa.
+- Pastas oferecem filtros **Tudo**, **Áudios** e **Vídeos**, incluindo o filtro já escolhido ao abrir uma pasta.
+- Títulos e artistas compostos só por `?` ou caracteres de substituição recebem fallback seguro para nome do arquivo ou rótulo amigável.
+
 ## v0.3.0-beta — Organização de arquivos
 
 - Listas retornam ao primeiro item ao mudar abas, filtros ou ordenação.

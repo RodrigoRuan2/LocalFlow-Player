@@ -18,4 +18,9 @@ class LibraryLogicTest {
         assertTrue(isWhatsAppAudioFolder("WhatsApp/Media/WhatsApp Voice Notes"))
         assertFalse(isWhatsAppAudioFolder("Music/Downloads"))
     }
+    @Test fun damagedMediaTagsFallBackToFilenameOrFriendlyName() {
+        assertEquals("Faixa boa",mediaDisplayTitle("????","Faixa boa.mp3",MediaKind.AUDIO,4))
+        assertEquals("Vídeo sem título 8",mediaDisplayTitle("????","????.mp4",MediaKind.VIDEO,8))
+        assertEquals("Artista desconhecido",mediaDisplayArtist("����"))
+    }
 }

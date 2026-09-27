@@ -6,7 +6,7 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.3.0-beta — Organização de arquivos** — o APK estará disponível na página de [Releases](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
+Versão atual: **v0.3.1-beta — Players e pastas adaptáveis** — o APK estará disponível na página de [Releases](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
 ## Midnight
 
@@ -17,6 +17,8 @@ Capas vêm do MediaStore ou dos metadados do arquivo; vídeos usam frames reais.
 Playlists permitem criar, renomear, selecionar várias mídias, abrir, reproduzir e remover itens. O painel de áudio oferece equalizador do Android quando disponível e timer por minutos ou fim da faixa.
 
 Áudios cujo caminho no MediaStore pertence ao WhatsApp são mostrados na aba **WhatsApp** dentro de Músicas, sem aparecer em Faixas. Músicas, WhatsApp e Vídeos guardam ordenações independentes.
+
+Na biblioteca de músicas, o botão de aleatório inicia uma fila embaralhada. A tela do player ajusta a capa à altura do aparelho para manter os controles principais visíveis. Vídeos têm tela cheia imersiva real e mostram anterior/próximo e a fila completa. Em Pastas, use os filtros **Tudo**, **Áudios** e **Vídeos** para não misturar os tipos.
 
 O modo **Selecionar arquivos** permite mover ou apagar vários arquivos locais. Apagar remove o arquivo físico somente após a confirmação nativa do Android. Mover cria uma pasta de destino compatível em `Music` para áudios e `Movies` para vídeos. Em playlists, a ação Remover nunca apaga o arquivo. Estas operações requerem Android 11 ou superior, pois versões anteriores não disponibilizam a autorização segura em lote.
 

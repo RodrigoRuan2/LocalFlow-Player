@@ -81,7 +81,7 @@ import kotlinx.coroutines.withContext
     }
 }
 
-@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
+@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,shuffle: (List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var sortMenu by remember { mutableStateOf(false) }
     var selecting by rememberSaveable(tab) { mutableStateOf(false) }
@@ -94,11 +94,19 @@ import kotlinx.coroutines.withContext
     val selected=remember(shown,selectedKeys) { shown.filter { it.key in selectedKeys } }
     LaunchedEffect(tab,selectedSort) { listState.scrollToItem(0) }
     Column {
-        PageHeader("Músicas",(state.songs.size+state.whatsAppAudio.size).toString()+" áudios no aparelho",actions={ if(tab<2) IconButton({ selecting=true }) { Icon(Icons.Default.SelectAll,"Selecionar arquivos") } })
+        PageHeader("Músicas",(state.songs.size+state.whatsAppAudio.size).toString()+" áudios no aparelho",actions={
+            if(tab<2) {
+                IconButton({ shuffle(shown) },enabled=shown.isNotEmpty()) { Icon(Icons.Default.Shuffle,"Tocar em aleatório") }
+                IconButton({ selecting=true }) { Icon(Icons.Default.SelectAll,"Selecionar arquivos") }
+            }
+            IconButton(search) { Icon(Icons.Default.Search,"Pesquisar") }
+        })
         MediaSelectionBar(selecting,selected,shown,state.folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=shown.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move)
-        Row(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            listOf("Faixas","WhatsApp","Álbuns","Artistas").forEachIndexed { i,s -> FilterChip(tab==i,{ tab=i },label={ Text(s) }) }
-            Spacer(Modifier.weight(1f)); IconButton(search) { Icon(Icons.Default.Search,"Pesquisar") }
+        LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                items(listOf("Faixas","WhatsApp","Álbuns","Artistas")) { label ->
+                    val index=listOf("Faixas","WhatsApp","Álbuns","Artistas").indexOf(label)
+                    FilterChip(tab==index,{ tab=index },label={ Text(label,maxLines=1) })
+                }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(when(tab) { 0->"Todas as músicas"; 1->"Áudios do WhatsApp"; 2->"Seus álbuns"; else->"Seus artistas" },Modifier.weight(1f),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -158,13 +166,23 @@ private fun sortMenuLabel(value: MediaSort): String = when(value) { MediaSort.TI
         }
     }
 }
-@Composable fun FoldersPage(folders: List<MediaFolder>,open: (String)->Unit) {
+@Composable fun FoldersPage(folders: List<MediaFolder>,open: (String,Int)->Unit) {
+    var filter by rememberSaveable { mutableIntStateOf(0) }
+    val visible=remember(folders,filter) { folders.filter { folder ->
+        when(filter) { 1 -> folder.musicCount+folder.whatsAppCount>0; 2 -> folder.videoCount>0; else -> true }
+    } }
     Column {
         PageHeader("Pastas","Organizadas como no seu aparelho")
+        LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            items(listOf("Tudo","Áudios","Vídeos")) { label ->
+                val index=listOf("Tudo","Áudios","Vídeos").indexOf(label)
+                FilterChip(filter==index,{ filter=index },label={ Text(label,maxLines=1) })
+            }
+        }
         LazyColumn(contentPadding=PaddingValues(20.dp)) {
-            if(folders.isEmpty()) item { EmptyContent("Nenhuma pasta encontrada","As pastas aparecem a partir dos arquivos locais.") }
-            items(folders,key={ it.name }) { f ->
-                Row(Modifier.fillMaxWidth().clickable { open(f.name) }.padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
+            if(visible.isEmpty()) item { EmptyContent("Nenhuma pasta encontrada",if(filter==0) "As pastas aparecem a partir dos arquivos locais." else "Nenhuma pasta contém esse tipo de mídia.") }
+            items(visible,key={ it.name }) { f ->
+                Row(Modifier.fillMaxWidth().clickable { open(f.name,filter) }.padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
                     Surface(Modifier.size(52.dp),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Box(contentAlignment=Alignment.Center) { Icon(Icons.Default.Folder,null,tint=MaterialTheme.colorScheme.primary) } }
                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) {
                         Text(f.name.substringAfterLast('/'),fontWeight=FontWeight.SemiBold); Text(f.name,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -181,12 +199,12 @@ private fun folderBreakdown(folder: MediaFolder): String = listOfNotNull(
     folder.videoCount.takeIf { it>0 }?.let { "$it vídeos" }
 ).joinToString(" · ").ifBlank { "outros" }
 
-@Composable fun CollectionPage(title: String,media: List<LocalMedia>,subtitle: String,favorites: Set<String>,back: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,toggle: (LocalMedia)->Unit,folders: List<MediaFolder>,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit,isFolder: Boolean=false) {
-    var filter by rememberSaveable(isFolder) { mutableIntStateOf(0) }
+@Composable fun CollectionPage(title: String,media: List<LocalMedia>,subtitle: String,favorites: Set<String>,back: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,toggle: (LocalMedia)->Unit,folders: List<MediaFolder>,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit,isFolder: Boolean=false,initialFilter: Int=0) {
+    var filter by rememberSaveable(isFolder,initialFilter) { mutableIntStateOf(initialFilter) }
     var selecting by rememberSaveable(isFolder) { mutableStateOf(false) }
     var selectedKeys by rememberSaveable(isFolder) { mutableStateOf(listOf<String>()) }
     val listState=rememberLazyListState()
-    val visible=remember(media,filter,isFolder) { when(filter) { 1->media.filter { it.kind==MediaKind.AUDIO && !it.isWhatsAppAudio() }; 2->media.filter { it.isWhatsAppAudio() }; 3->media.filter { it.kind==MediaKind.VIDEO }; else->media } }
+    val visible=remember(media,filter,isFolder) { if(!isFolder) media else when(filter) { 1->media.filter { it.kind==MediaKind.AUDIO }; 2->media.filter { it.kind==MediaKind.VIDEO }; else->media } }
     val selected=remember(visible,selectedKeys) { visible.filter { it.key in selectedKeys } }
     LaunchedEffect(filter) { listState.scrollToItem(0) }
     LazyColumn(state=listState,contentPadding=PaddingValues(bottom=16.dp)) {
@@ -195,7 +213,7 @@ private fun folderBreakdown(folder: MediaFolder): String = listOfNotNull(
             MediaThumbnail(media.firstOrNull(),Modifier.size(116.dp),large=true); Spacer(Modifier.width(18.dp))
             Column { Text(media.size.toString()+" arquivos",style=MaterialTheme.typography.titleMedium); Text(formatTime(media.sumOf { it.durationMs }),color=MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(12.dp)); Button({ visible.firstOrNull()?.let { play(it,visible) } },enabled=visible.isNotEmpty()) { Icon(Icons.Default.PlayArrow,null); Text("Reproduzir") } }
         } }
-        if(isFolder) item { Row(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("Tudo","Músicas","WhatsApp","Vídeos").forEachIndexed { i,label -> FilterChip(filter==i,{ filter=i },label={ Text(label) }) } } }
+        if(isFolder) item { LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { items(listOf("Tudo","Áudios","Vídeos")) { label -> val index=listOf("Tudo","Áudios","Vídeos").indexOf(label); FilterChip(filter==index,{ filter=index },label={ Text(label,maxLines=1) }) } } }
         item { MediaSelectionBar(selecting,selected,visible,folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=visible.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move) }
         item { if(!selecting) TextButton({ selecting=true },Modifier.padding(horizontal=12.dp)) { Icon(Icons.Default.SelectAll,null); Text("Selecionar arquivos") } }
         if(visible.isEmpty()) item { EmptyContent("Coleção indisponível","Os arquivos podem ter sido movidos, excluídos ou não correspondem ao filtro.") }
