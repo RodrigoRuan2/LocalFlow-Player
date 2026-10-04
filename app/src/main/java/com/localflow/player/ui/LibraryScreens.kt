@@ -1,6 +1,7 @@
 package com.localflow.player.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,7 +83,7 @@ import kotlinx.coroutines.withContext
     }
 }
 
-@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,shuffle: (List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
+@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,shuffle: (List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,addSelected: (List<LocalMedia>)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var sortMenu by remember { mutableStateOf(false) }
     var selecting by rememberSaveable(tab) { mutableStateOf(false) }
@@ -101,7 +103,7 @@ import kotlinx.coroutines.withContext
             }
             IconButton(search) { Icon(Icons.Default.Search,"Pesquisar") }
         })
-        MediaSelectionBar(selecting,selected,shown,state.folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=shown.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move)
+        MediaSelectionBar(selecting,selected,shown,state.folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=shown.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move,allowPlaylistAdd=true,addToPlaylist=addSelected)
         LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 items(listOf("Faixas","WhatsApp","Álbuns","Artistas")) { label ->
                     val index=listOf("Faixas","WhatsApp","Álbuns","Artistas").indexOf(label)
@@ -118,7 +120,7 @@ import kotlinx.coroutines.withContext
             }
         }
         if(state.loading) Box(Modifier.fillMaxSize(),Alignment.Center) { CircularProgressIndicator() }
-        else LazyColumn(state=listState,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
+        else LazyColumn(state=listState,modifier=if(tab<2) Modifier.dragSelectMedia(listState,shown,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }) else Modifier,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
             if(shown.isEmpty() && tab<2) item { EmptyContent(if(tab==1) "Nenhum áudio do WhatsApp encontrado" else "Nenhuma música encontrada",if(tab==1) "Os áudios em pastas do WhatsApp aparecem separados aqui." else "Confira a permissão para músicas e os arquivos salvos no aparelho.") }
             if(tab==0) {
                 items(state.songs,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.songs) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
@@ -166,23 +168,27 @@ private fun sortMenuLabel(value: MediaSort): String = when(value) { MediaSort.TI
         }
     }
 }
-@Composable fun FoldersPage(folders: List<MediaFolder>,open: (String,Int)->Unit) {
-    var filter by rememberSaveable { mutableIntStateOf(0) }
+@Composable fun FoldersPage(folders: List<MediaFolder>,filter: FolderFilter,sort: FolderSort,setFilter: (FolderFilter)->Unit,setSort: (FolderSort)->Unit,open: (String,Int)->Unit) {
+    var sortMenu by remember { mutableStateOf(false) }
     val visible=remember(folders,filter) { folders.filter { folder ->
-        when(filter) { 1 -> folder.musicCount+folder.whatsAppCount>0; 2 -> folder.videoCount>0; else -> true }
+        when(filter) { FolderFilter.AUDIO -> folder.musicCount+folder.whatsAppCount>0; FolderFilter.VIDEO -> folder.videoCount>0; FolderFilter.ALL -> true }
     } }
     Column {
-        PageHeader("Pastas","Organizadas como no seu aparelho")
+        PageHeader("Pastas","Organizadas como no seu aparelho",actions={
+            Box {
+                IconButton({ sortMenu=true }) { Icon(Icons.Default.Sort,"Ordenar por "+folderSortLabel(sort)) }
+                DropdownMenu(sortMenu,{ sortMenu=false }) { FolderSort.entries.forEach { value -> DropdownMenuItem(text={ Text(folderSortLabel(value)) },onClick={ sortMenu=false; setSort(value) }) } }
+            }
+        })
         LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            items(listOf("Tudo","Áudios","Vídeos")) { label ->
-                val index=listOf("Tudo","Áudios","Vídeos").indexOf(label)
-                FilterChip(filter==index,{ filter=index },label={ Text(label,maxLines=1) })
+            items(FolderFilter.entries) { value ->
+                FilterChip(filter==value,{ setFilter(value) },label={ Text(folderFilterLabel(value),maxLines=1) })
             }
         }
         LazyColumn(contentPadding=PaddingValues(20.dp)) {
-            if(visible.isEmpty()) item { EmptyContent("Nenhuma pasta encontrada",if(filter==0) "As pastas aparecem a partir dos arquivos locais." else "Nenhuma pasta contém esse tipo de mídia.") }
+            if(visible.isEmpty()) item { EmptyContent("Nenhuma pasta encontrada",if(filter==FolderFilter.ALL) "As pastas aparecem a partir dos arquivos locais." else "Nenhuma pasta contém esse tipo de mídia.") }
             items(visible,key={ it.name }) { f ->
-                Row(Modifier.fillMaxWidth().clickable { open(f.name,filter) }.padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().clickable { open(f.name,filter.ordinal) }.padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
                     Surface(Modifier.size(52.dp),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) { Box(contentAlignment=Alignment.Center) { Icon(Icons.Default.Folder,null,tint=MaterialTheme.colorScheme.primary) } }
                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) {
                         Text(f.name.substringAfterLast('/'),fontWeight=FontWeight.SemiBold); Text(f.name,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -193,11 +199,22 @@ private fun sortMenuLabel(value: MediaSort): String = when(value) { MediaSort.TI
         }
     }
 }
+private fun folderFilterLabel(value: FolderFilter) = when(value) { FolderFilter.ALL->"Tudo"; FolderFilter.AUDIO->"Áudios"; FolderFilter.VIDEO->"Vídeos" }
+private fun folderSortLabel(value: FolderSort) = when(value) { FolderSort.NAME->"Nome"; FolderSort.MOST_ITEMS->"Mais arquivos" }
 private fun folderBreakdown(folder: MediaFolder): String = listOfNotNull(
     folder.musicCount.takeIf { it>0 }?.let { "$it músicas" },
     folder.whatsAppCount.takeIf { it>0 }?.let { "$it WhatsApp" },
     folder.videoCount.takeIf { it>0 }?.let { "$it vídeos" }
 ).joinToString(" · ").ifBlank { "outros" }
+
+/** A long press starts selection; dragging over visible rows adds each one without reopening menus. */
+private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia>,start: (String)->Unit,extend: (String)->Unit): Modifier = pointerInput(media) {
+    fun itemAt(y: Float): LocalMedia? = state.layoutInfo.visibleItemsInfo.firstOrNull { info -> y>=info.offset && y<info.offset+info.size }?.let { media.getOrNull(it.index) }
+    detectDragGesturesAfterLongPress(
+        onDragStart={ point -> itemAt(point.y)?.let { start(it.key) } },
+        onDrag={ change,_ -> itemAt(change.position.y)?.let { extend(it.key) } }
+    )
+}
 
 @Composable fun CollectionPage(title: String,media: List<LocalMedia>,subtitle: String,favorites: Set<String>,back: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,toggle: (LocalMedia)->Unit,folders: List<MediaFolder>,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit,isFolder: Boolean=false,initialFilter: Int=0) {
     var filter by rememberSaveable(isFolder,initialFilter) { mutableIntStateOf(initialFilter) }

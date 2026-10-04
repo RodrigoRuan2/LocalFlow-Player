@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## v0.4.0-beta — Favoritos e organização fluida
+
+- A notificação e os controles de mídia do sistema passam a oferecer **Adicionar aos favoritos**; ao tocar, a ação é persistida no mesmo banco do app e alterna para remover.
+- Em Músicas, um toque longo seguido de arrasto seleciona diversas faixas visíveis; a seleção permite adicionar todas a uma playlist, mover para pasta ou apagar com confirmação do Android.
+- Pastas persistem os filtros Tudo, Áudios e Vídeos e a ordenação por Nome ou Mais arquivos entre aberturas do app.
+
 ## v0.3.1-beta — Players e pastas adaptáveis
 
 - Abas de Músicas adaptadas para telas estreitas: Faixas, WhatsApp, Álbuns e Artistas não sobrepõem letras; busca foi para o cabeçalho.

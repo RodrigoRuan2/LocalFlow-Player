@@ -48,6 +48,7 @@ import com.localflow.player.playback.PlayerConnection
     var permissionVersion by remember { mutableIntStateOf(0) }
     var skipPermission by rememberSaveable { mutableStateOf(false) }
     var adding by remember { mutableStateOf<LocalMedia?>(null) }
+    var addingMany by remember { mutableStateOf<List<LocalMedia>?>(null) }
     var pendingFileOperation by remember { mutableStateOf<MediaFileOperation?>(null) }
     val launcher=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissionVersion++; vm.refresh() }
     val fileOperationLauncher=rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -117,9 +118,9 @@ import com.localflow.player.playback.PlayerConnection
             }) { padding ->
                 NavHost(nav,"home",Modifier.padding(padding)) {
                     composable("home") { HomePage(library,collections,favoriteKeys,player,::open,::play,{ adding=it },vm::toggleFavorite) }
-                    composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,::shuffle,{ adding=it },vm::requestDelete,vm::requestMove) }
+                    composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,::shuffle,{ adding=it },{ addingMany=it },vm::requestDelete,vm::requestMove) }
                     composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,library.folders,vm::requestDelete,vm::requestMove,sort=library.videoSort,order={ vm.order(LibrarySection.VIDEO,it) }) }
-                    composable("folders") { FoldersPage(library.folders,::folder) }
+                    composable("folders") { FoldersPage(library.folders,settings.folderFilter,settings.folderSort,vm::setFolderFilter,vm::setFolderSort,::folder) }
                     composable("group/{type}/{id}?filter={filter}",arguments=listOf(navArgument("filter") { defaultValue=0 })) { e ->
                         val type=e.arguments?.getString("type").orEmpty(); val id=e.arguments?.getString("id").orEmpty()
                         val folderFilter=e.arguments?.getInt("filter") ?: 0
@@ -153,6 +154,7 @@ import com.localflow.player.playback.PlayerConnection
                 }
             }
             adding?.let { item -> PlaylistChooser(playlists,{ adding=null },{ id -> vm.addToPlaylist(id,item); adding=null },{ name -> vm.createPlaylist(name) { id -> vm.addToPlaylist(id,item); adding=null } }) }
+            addingMany?.let { items -> PlaylistChooser(playlists,{ addingMany=null },{ id -> vm.addToPlaylist(id,items); addingMany=null },{ name -> vm.createPlaylist(name) { id -> vm.addToPlaylist(id,items); addingMany=null } }) }
         }
     }
 }

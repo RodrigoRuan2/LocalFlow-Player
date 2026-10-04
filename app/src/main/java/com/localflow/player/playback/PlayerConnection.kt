@@ -80,6 +80,7 @@ class PlayerConnection(context: Context) : Player.Listener, AutoCloseable {
     fun videoVisible(value: Boolean) = command(Bundle().apply { putBoolean("visible",value) })
     fun checkpoint() = command(Bundle().apply { putBoolean("checkpoint",true) })
     fun audioOnly(value: Boolean) = command(Bundle().apply { putBoolean("audioOnly",value) })
+    fun refreshFavoriteButton() = command(Bundle().apply { putBoolean("favoriteRefresh",true) })
     fun timer(minutes: Int,finishTrack: Boolean=false) = command(Bundle().apply { putInt("timerMinutes",minutes); putBoolean("finishTrack",finishTrack) })
     fun equalizer(enabled: Boolean, gains: List<Int>) = command(Bundle().apply { putBoolean("eqEnabled",enabled); putIntArray("gains",gains.toIntArray()) })
     fun clearError() = command(Bundle().apply { putBoolean("clearError",true) })

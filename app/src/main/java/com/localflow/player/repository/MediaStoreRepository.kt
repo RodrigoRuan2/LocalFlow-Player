@@ -17,7 +17,7 @@ class MediaStoreRepository(context: Context) {
     private val resolver = context.contentResolver
     suspend fun audio(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.AUDIO, sort)
     suspend fun videos(sort: MediaSort = MediaSort.TITLE) = query(MediaKind.VIDEO, sort)
-    fun foldersFrom(items: List<LocalMedia>) = items.groupBy { it.folder }.map { (path, media) ->
+    fun foldersFrom(items: List<LocalMedia>, sort: FolderSort = FolderSort.NAME) = items.groupBy { it.folder }.map { (path, media) ->
         MediaFolder(
             name=path,
             count=media.size,
@@ -26,7 +26,7 @@ class MediaStoreRepository(context: Context) {
             whatsAppCount=media.count { it.isWhatsAppAudio() },
             videoCount=media.count { it.kind==MediaKind.VIDEO }
         )
-    }.sortedBy { it.name.lowercase() }
+    }.let { folders -> when(sort) { FolderSort.NAME -> folders.sortedBy { it.name.lowercase() }; FolderSort.MOST_ITEMS -> folders.sortedWith(compareByDescending<MediaFolder> { it.count }.thenBy { it.name.lowercase() }) } }
 
     /** Called only after the Android write-consent dialog has approved these exact URIs. */
     suspend fun moveToManagedFolder(items: List<LocalMedia>, destinationName: String): Int = withContext(Dispatchers.IO) {

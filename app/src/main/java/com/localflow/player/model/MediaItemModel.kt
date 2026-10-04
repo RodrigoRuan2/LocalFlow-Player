@@ -5,6 +5,8 @@ import android.net.Uri
 enum class MediaKind { AUDIO, VIDEO }
 enum class MediaSort { TITLE, ARTIST, DATE_ADDED, DURATION }
 enum class LibrarySection { MUSIC, WHATSAPP_AUDIO, VIDEO }
+enum class FolderFilter { ALL, AUDIO, VIDEO }
+enum class FolderSort { NAME, MOST_ITEMS }
 
 data class LocalMedia(
     val id: Long,

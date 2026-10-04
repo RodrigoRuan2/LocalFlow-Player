@@ -1,7 +1,7 @@
 # Desenvolvimento — LocalFlow Player
 
 ## Fase atual
-Beta 0.3.1: correções de layout real, players e filtros de pastas implementados; compilação e validação final em andamento.
+Beta 0.4.0: favorito nos controles de mídia, seleção fluida e preferências persistentes de Pastas implementados; validação final em andamento.
 
 ## Concluído
 - Midnight aplicado em biblioteca, álbuns, artistas, pastas, vídeos, favoritos, playlists, busca, players, fila e configurações.
@@ -14,6 +14,9 @@ Beta 0.3.1: correções de layout real, players e filtros de pastas implementado
 - Abas compactas de Músicas, shuffle direto na biblioteca, título/fallback de metadados danificados e player de áudio adaptável à altura.
 - Vídeo em tela cheia imersiva real, prévia de anterior/próximo e atalho à fila completa.
 - Pastas filtráveis por tudo, áudios ou vídeos; o filtro é mantido ao abrir a pasta.
+- Ação nativa de favorito adicionada à MediaSession/notificação, conectada diretamente ao banco Room de favoritos.
+- Seleção por toque longo e arrasto para as faixas visíveis; ações em lote incluem playlist, mover e apagar.
+- Filtro e ordenação de Pastas persistidos com DataStore.
 
 ## Decisões
 - Room para coleções, DataStore para preferências; banco existente preservado.
@@ -26,6 +29,7 @@ Beta 0.3.1: correções de layout real, players e filtros de pastas implementado
 - `assembleDebug` e seis testes unitários passaram após a separação de biblioteca (4 min 28 s).
 - `assembleDebug` e seis testes unitários passaram após as ações de biblioteca (5 min 30 s).
 - `assembleDebug` e sete testes unitários passaram após os ajustes de player e biblioteca (validação visual em emulador Android 15).
+- Serviço de mídia Android 15 validado: ação customizada **Adicionar aos favoritos** aparece nos controles da MediaSession.
 - Build final `assembleDebug`, seis testes unitários e `lintDebug`: **BUILD SUCCESSFUL** (7 min 33 s; 0 erros no lint).
 - Android 15/API 35: instalação e reinstalação sem apagar dados, capas/thumbnail, áudio com tela bloqueada, notificação, vídeo normal/somente áudio e pausa quando background desligado.
 - Interface: playlist criada, adição de áudio e vídeo, abertura; favorito, busca, pastas, álbuns, fila reordenada e timer ativado/cancelado.
@@ -39,7 +43,7 @@ Beta 0.3.1: correções de layout real, players e filtros de pastas implementado
 - Biblioteca ainda mantém metadados completos em RAM; falta paginação para acervos muito grandes.
 
 ## Próximos passos
-- Testar esta beta no celular: Bluetooth, chamadas, formatos variados, tela cheia imersiva e consumo prolongado.
+- Testar esta beta no celular: toque no favorito pela notificação/tela bloqueada, seleção por arrasto, filtros persistentes e consumo prolongado.
 - Testar em aparelho com áudios WhatsApp: confirmar caminhos antigos/novos e a independência das três ordenações.
 - Testar em Android 11+: confirmação para apagar/mover, cancelamento, pastas de destino e atualização imediata da biblioteca.
 - Perfil de memória/bateria em aparelho de entrada e testes adicionais de permissões revogadas/arquivos corrompidos.

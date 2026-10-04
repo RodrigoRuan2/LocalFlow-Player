@@ -13,14 +13,18 @@ import androidx.media3.common.util.BitmapLoader
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.*
 import com.google.common.util.concurrent.*
+import com.localflow.player.LocalFlowApp
 import com.localflow.player.MainActivity
 import com.localflow.player.data.AppSettings
+import com.localflow.player.data.FavoriteEntity
 import com.localflow.player.data.SettingsRepository
 import com.localflow.player.repository.ArtworkRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
+
+private const val TOGGLE_FAVORITE = "com.localflow.player.TOGGLE_FAVORITE"
 
 /** The session owns playback, effects, background-video policy and the sleep timer. */
 class LocalFlowPlaybackService : MediaSessionService() {
@@ -40,6 +44,7 @@ class LocalFlowPlaybackService : MediaSessionService() {
     private var snapshotJob: Job?=null
     private var failureCount=0
     private var screenOn=true
+    private val favoriteCommand=SessionCommand(TOGGLE_FAVORITE,Bundle.EMPTY)
     private val timerAction=Runnable { player.pause(); timerEnd=0; finishTrack=false; publishExtras(); saveSnapshot() }
     private val receiver=object:BroadcastReceiver() {
         override fun onReceive(context: Context,intent: Intent) {
@@ -57,21 +62,28 @@ class LocalFlowPlaybackService : MediaSessionService() {
             setWakeMode(C.WAKE_MODE_LOCAL)
         }
         val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        session=MediaSession.Builder(this,player).setSessionActivity(open).setBitmapLoader(object:BitmapLoader {
+        session=MediaSession.Builder(this,player).setSessionActivity(open).setCustomLayout(listOf(favoriteButton(false))).setMediaButtonPreferences(listOf(favoriteButton(false))).setBitmapLoader(object:BitmapLoader {
             override fun supportsMimeType(mimeType: String)=mimeType.startsWith("image/")
             override fun decodeBitmap(data: ByteArray):ListenableFuture<Bitmap> = bitmapFuture { ArtworkRepository.decode(data) }
             override fun loadBitmap(uri: Uri):ListenableFuture<Bitmap> = bitmapFuture { ArtworkRepository.load(applicationContext,uri,requested=512) }
         }).setCallback(object:MediaSession.Callback {
             override fun onConnect(session: MediaSession,controller: MediaSession.ControllerInfo):MediaSession.ConnectionResult {
                 val result=super.onConnect(session,controller)
-                if(controller.packageName!=packageName) return result
-                return MediaSession.ConnectionResult.accept(result.availableSessionCommands.buildUpon().add(SessionCommand(PLAYBACK_OPTIONS,Bundle.EMPTY)).build(),result.availablePlayerCommands)
+                val commands=result.availableSessionCommands.buildUpon().add(favoriteCommand).apply {
+                    if(controller.packageName==packageName) add(SessionCommand(PLAYBACK_OPTIONS,Bundle.EMPTY))
+                }.build()
+                return MediaSession.ConnectionResult.accept(commands,result.availablePlayerCommands)
             }
             override fun onCustomCommand(session: MediaSession,controller: MediaSession.ControllerInfo,customCommand: SessionCommand,args: Bundle):ListenableFuture<SessionResult> {
+                if(customCommand.customAction==TOGGLE_FAVORITE) {
+                    toggleCurrentFavorite()
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
                 if(controller.packageName!=packageName || customCommand.customAction!=PLAYBACK_OPTIONS) return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
                 if(args.containsKey("visible")) { videoVisible=args.getBoolean("visible"); if(!videoVisible) saveSnapshot() }
                 if(args.getBoolean("checkpoint")) saveSnapshot()
                 if(args.containsKey("audioOnly")) audioOnly=args.getBoolean("audioOnly")
+                if(args.getBoolean("favoriteRefresh")) refreshFavoriteButton()
                 if(args.getBoolean("clearError")) { error=null; failureCount=0 }
                 if(args.containsKey("timerMinutes")) {
                     handler.removeCallbacks(timerAction)
@@ -97,7 +109,7 @@ class LocalFlowPlaybackService : MediaSessionService() {
                 if(audioSessionId!=C.AUDIO_SESSION_ID_UNSET) eq=runCatching { Equalizer(0,audioSessionId) }.getOrNull()
                 applyEqualizer(); publishExtras()
             }
-            override fun onMediaItemTransition(mediaItem: MediaItem?,reason: Int) { applyVideoPolicy(); saveSnapshot() }
+            override fun onMediaItemTransition(mediaItem: MediaItem?,reason: Int) { applyVideoPolicy(); saveSnapshot(); refreshFavoriteButton() }
             override fun onPlaybackStateChanged(playbackState: Int) { if(playbackState==Player.STATE_READY) failureCount=0 }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean,reason: Int) {
                 if(!playWhenReady) saveSnapshot()
@@ -128,6 +140,41 @@ class LocalFlowPlaybackService : MediaSessionService() {
             }
         }
         publishExtras()
+        refreshFavoriteButton()
+    }
+    private fun favoriteButton(favorite: Boolean) = CommandButton.Builder(if(favorite) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
+        .setSessionCommand(favoriteCommand)
+        .setDisplayName(if(favorite) "Remover dos favoritos" else "Adicionar aos favoritos")
+        .setSlots(CommandButton.SLOT_FORWARD_SECONDARY,CommandButton.SLOT_OVERFLOW)
+        .build()
+    private fun currentFavoriteId(): Pair<Long,String>? {
+        val id=player.currentMediaItem?.mediaId ?: return null
+        val kind=id.substringBefore(':')
+        val mediaId=id.substringAfter(':',"").toLongOrNull() ?: return null
+        if(kind!="AUDIO" && kind!="VIDEO") return null
+        return mediaId to kind
+    }
+    private fun refreshFavoriteButton() {
+        val current=currentFavoriteId()
+        if(current==null) {
+            session?.setCustomLayout(emptyList())
+            session?.setMediaButtonPreferences(emptyList())
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            val favorite=(application as LocalFlowApp).container.database.libraryDao().isFavorite(current.first,current.second)>0
+            withContext(Dispatchers.Main.immediate) {
+                session?.setCustomLayout(listOf(favoriteButton(favorite)))
+                session?.setMediaButtonPreferences(listOf(favoriteButton(favorite)))
+            }
+        }
+    }
+    private fun toggleCurrentFavorite() {
+        val current=currentFavoriteId() ?: return
+        scope.launch(Dispatchers.IO) {
+            (application as LocalFlowApp).container.database.libraryDao().toggleFavorite(FavoriteEntity(current.first,current.second))
+            withContext(Dispatchers.Main.immediate) { refreshFavoriteButton() }
+        }
     }
     private fun bitmapFuture(load: suspend ()->Bitmap?):ListenableFuture<Bitmap> {
         val future=SettableFuture.create<Bitmap>()

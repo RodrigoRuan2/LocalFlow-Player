@@ -42,7 +42,7 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
         val music=visibleAudio.filterNot { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.MUSIC))
         val whatsapp=visibleAudio.filter { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO))
         val video=library.videos.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(currentSorts.getValue(LibrarySection.VIDEO))
-        library.copy(songs=music,whatsAppAudio=whatsapp,videos=video,folders=app.mediaRepository.foldersFrom(music+whatsapp+video),songSort=currentSorts.getValue(LibrarySection.MUSIC),whatsAppSort=currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO),videoSort=currentSorts.getValue(LibrarySection.VIDEO))
+        library.copy(songs=music,whatsAppAudio=whatsapp,videos=video,folders=app.mediaRepository.foldersFrom(music+whatsapp+video,preferences.folderSort),songSort=currentSorts.getValue(LibrarySection.MUSIC),whatsAppSort=currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO),videoSort=currentSorts.getValue(LibrarySection.VIDEO))
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),LibraryState())
     val favorites=dao.favorites().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val playlists=dao.playlists().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
@@ -72,6 +72,8 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
         }
     }
     fun order(section: LibrarySection,value: MediaSort) { sorts.update { it + (section to value) } }
+    fun setFolderFilter(value: FolderFilter) = action { app.settings.setFolderFilter(value) }
+    fun setFolderSort(value: FolderSort) = action { app.settings.setFolderSort(value) }
     fun play(item: LocalMedia, source: List<LocalMedia>) = app.player.play(source,source.indexOf(item).coerceAtLeast(0))
     fun requestDelete(items: List<LocalMedia>) { if(items.isNotEmpty()) viewModelScope.launch { pendingFileOperations.send(MediaFileOperation.Delete(items.distinctBy { it.key })) } }
     fun requestMove(items: List<LocalMedia>,destinationName: String) {
@@ -95,7 +97,10 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
         try { block() } catch(e: CancellationException) { throw e }
         catch(e: Exception) { notices.send("Não foi possível salvar. Tente novamente.") }
     }
-    fun toggleFavorite(item: LocalMedia) = action { dao.toggleFavorite(FavoriteEntity(item.id,item.kind.name)) }
+    fun toggleFavorite(item: LocalMedia) = action {
+        dao.toggleFavorite(FavoriteEntity(item.id,item.kind.name))
+        if(app.player.state.value.mediaId==item.key) app.player.refreshFavoriteButton()
+    }
     fun createPlaylist(name: String, done: (Long)->Unit = {}) = action {
         if(name.isBlank()) return@action
         val id=dao.createPlaylist(PlaylistEntity(name=name.trim().take(80)))

@@ -91,7 +91,9 @@ import com.localflow.player.model.*
     selectAll: ()->Unit,
     close: ()->Unit,
     delete: (List<LocalMedia>)->Unit,
-    move: (List<LocalMedia>,String)->Unit
+    move: (List<LocalMedia>,String)->Unit,
+    allowPlaylistAdd: Boolean=false,
+    addToPlaylist: (List<LocalMedia>)->Unit={}
 ) {
     if(!selecting) return
     var confirmDelete by remember { mutableStateOf(false) }
@@ -100,6 +102,7 @@ import com.localflow.player.model.*
         Row(Modifier.padding(horizontal=12.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(selected.size.toString()+" selecionados",Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
             IconButton(selectAll,enabled=allItems.isNotEmpty()) { Icon(Icons.Default.SelectAll,"Selecionar todos") }
+            if(allowPlaylistAdd) IconButton({ addToPlaylist(selected); close() },enabled=selected.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd,"Adicionar à playlist") }
             IconButton({ showMove=true },enabled=selected.isNotEmpty()) { Icon(Icons.Default.DriveFileMove,"Mover selecionados") }
             IconButton({ confirmDelete=true },enabled=selected.isNotEmpty()) { Icon(Icons.Default.DeleteOutline,"Apagar do dispositivo") }
             IconButton(close) { Icon(Icons.Default.Close,"Cancelar seleção") }
