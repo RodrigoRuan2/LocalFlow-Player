@@ -6,7 +6,7 @@ Player Android local, offline e leve para áudio e vídeo armazenados no aparelh
 
 Baixe sempre a versão mais recente na página de [Releases do LocalFlow Player](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
-Versão atual: **v0.4.1-beta — Seleção e filtros persistentes** — o APK estará disponível na página de [Releases](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
+Versão atual: **v0.4.2-beta — Seleção com auto-rolagem** — o APK estará disponível na página de [Releases](https://github.com/RodrigoRuan2/LocalFlow-Player/releases).
 
 ## Midnight
 

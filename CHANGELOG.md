@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## v0.4.2-beta — Seleção com auto-rolagem
+
+- Corrigido o reconhecimento do toque longo e arrasto: a seleção é tratada pela própria lista, sem competir com os botões de cada mídia.
+- Ao manter o dedo próximo à borda superior ou inferior durante a seleção, a lista acompanha o gesto e continua selecionando os itens percorridos.
+
 ## v0.4.1-beta — Seleção e filtros persistentes
 
 - A seleção em lote não exige mais tocar em **Selecionar arquivos**: segure uma mídia e deslize por outras faixas ou vídeos visíveis, como em uma galeria Android.

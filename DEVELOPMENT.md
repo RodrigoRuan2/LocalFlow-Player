@@ -1,7 +1,7 @@
 # Desenvolvimento — LocalFlow Player
 
 ## Fase atual
-Beta 0.4.1: seleção por gesto de galeria e preferências de biblioteca persistentes implementadas; validação final em andamento.
+Beta 0.4.2: seleção por gesto de galeria com auto-rolagem e preferências de biblioteca persistentes implementadas; validação final em andamento.
 
 ## Concluído
 - Midnight aplicado em biblioteca, álbuns, artistas, pastas, vídeos, favoritos, playlists, busca, players, fila e configurações.
@@ -19,6 +19,7 @@ Beta 0.4.1: seleção por gesto de galeria e preferências de biblioteca persist
 - Filtro e ordenação de Pastas persistidos com DataStore.
 - Seleção em lote sem botão: toque longo e arrasto em músicas, vídeos, favoritos e coleções; a rolagem normal continua usando LazyColumn nativo.
 - Aba de Músicas e ordenações de músicas, WhatsApp e vídeos persistidas em DataStore entre execuções.
+- Auto-rolagem durante a seleção: ao chegar às bordas da lista com o dedo pressionado, a biblioteca segue a direção e seleciona os itens atravessados.
 
 ## Decisões
 - Room para coleções, DataStore para preferências; banco existente preservado.
@@ -34,6 +35,7 @@ Beta 0.4.1: seleção por gesto de galeria e preferências de biblioteca persist
 - Serviço de mídia Android 15 validado: ação customizada **Adicionar aos favoritos** aparece nos controles da MediaSession.
 - Build final `assembleDebug`, seis testes unitários e `lintDebug`: **BUILD SUCCESSFUL** (7 min 33 s; 0 erros no lint).
 - Build final da beta 0.4.1: `assembleDebug`, sete testes unitários e `lintDebug` concluídos; APK assinado verificado (v2) e lint com 0 erros/6 avisos existentes.
+- Build da beta 0.4.2: `assembleDebug` e sete testes unitários concluídos; APK v2 assinado, versão 9 confirmada.
 - Android 15/API 35: instalação e reinstalação sem apagar dados, capas/thumbnail, áudio com tela bloqueada, notificação, vídeo normal/somente áudio e pausa quando background desligado.
 - Interface: playlist criada, adição de áudio e vídeo, abertura; favorito, busca, pastas, álbuns, fila reordenada e timer ativado/cancelado.
 - Runner Room em memória: criação, adição, duplicados, remoção, ordem, renomeação, favoritos e exclusão passaram.

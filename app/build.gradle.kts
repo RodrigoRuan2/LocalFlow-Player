@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.localflow.player"
     compileSdk = 35
-    defaultConfig { applicationId = "com.localflow.player"; minSdk = 26; targetSdk = 35; versionCode = 8; versionName = "0.4.1-beta" }
+    defaultConfig { applicationId = "com.localflow.player"; minSdk = 26; targetSdk = 35; versionCode = 9; versionName = "0.4.2-beta" }
     buildFeatures { compose = true; buildConfig = true }
     defaultConfig { testInstrumentationRunner = "com.localflow.player.LocalFlowTestRunner" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

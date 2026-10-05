@@ -2,6 +2,7 @@ package com.localflow.player.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +24,11 @@ import com.localflow.player.data.*
 import com.localflow.player.model.*
 import com.localflow.player.playback.PlayerConnection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable fun HomePage(state: LibraryState,collections: List<PlaylistDetail>,favorites: Set<String>,player: PlayerConnection,open: (String)->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,toggle: (LocalMedia)->Unit) {
@@ -123,9 +128,9 @@ import kotlinx.coroutines.withContext
         else LazyColumn(state=listState,modifier=if(tab<2) Modifier.dragSelectMedia(listState,shown,0,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }) else Modifier,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
             if(shown.isEmpty() && tab<2) item { EmptyContent(if(tab==1) "Nenhum áudio do WhatsApp encontrado" else "Nenhuma música encontrada",if(tab==1) "Os áudios em pastas do WhatsApp aparecem separados aqui." else "Confira a permissão para músicas e os arquivos salvos no aparelho.") }
             if(tab==0) {
-                items(state.songs,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.songs) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
+                items(state.songs,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.songs) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
             } else if(tab==1) {
-                items(state.whatsAppAudio,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.whatsAppAudio) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
+                items(state.whatsAppAudio,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.whatsAppAudio) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
             } else {
                 items(grouped.entries.toList(),key={ it.key }) { (key,media) ->
                     Row(Modifier.fillMaxWidth().clickable { group(if(tab==2) "album" else "artist",key) }.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -163,7 +168,7 @@ private fun sortMenuLabel(value: MediaSort): String = when(value) { MediaSort.TI
         if(loading) Box(Modifier.fillMaxSize(),Alignment.Center) { CircularProgressIndicator() }
         else LazyColumn(state=listState,modifier=Modifier.dragSelectMedia(listState,items,0,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }),contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
             if(items.isEmpty()) item { EmptyContent(if(title=="Favoritos") "Seus favoritos aparecem aqui" else "Nenhum vídeo encontrado",if(title=="Favoritos") "Use o menu de uma música ou vídeo para favoritar." else "Confira o acesso a vídeos nas configurações.") }
-            items(items,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,items) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
+            items(items,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,items) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
         }
     }
 }
@@ -206,13 +211,39 @@ private fun folderBreakdown(folder: MediaFolder): String = listOfNotNull(
     folder.videoCount.takeIf { it>0 }?.let { "$it vídeos" }
 ).joinToString(" · ").ifBlank { "outros" }
 
-/** A long press starts selection; dragging over visible rows adds each one without reopening menus. */
+/** A long press starts selection; dragging selects rows and auto-scrolls near the list edges. */
 private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia>,firstMediaItemIndex: Int,start: (String)->Unit,extend: (String)->Unit): Modifier = pointerInput(media,firstMediaItemIndex) {
     fun itemAt(y: Float): LocalMedia? = state.layoutInfo.visibleItemsInfo.firstOrNull { info -> y>=info.offset && y<info.offset+info.size }?.let { media.getOrNull(it.index-firstMediaItemIndex) }
-    detectDragGesturesAfterLongPress(
-        onDragStart={ point -> itemAt(point.y)?.let { start(it.key) } },
-        onDrag={ change,_ -> itemAt(change.position.y)?.let { extend(it.key) } }
-    )
+    coroutineScope {
+        var autoScrollJob: Job?=null
+        var autoScroll=0f
+        var pointerY=0f
+        fun stopAutoScroll() { autoScroll=0f; autoScrollJob?.cancel(); autoScrollJob=null }
+        detectDragGesturesAfterLongPress(
+            onDragStart={ point -> itemAt(point.y)?.let { start(it.key) } },
+            onDrag={ change,_ ->
+                pointerY=change.position.y
+                itemAt(pointerY)?.let { extend(it.key) }
+                val edge=56.dp.toPx()
+                val speed=24.dp.toPx()
+                autoScroll=when {
+                    pointerY<edge -> -((edge-pointerY)/edge).coerceIn(0f,1f)*speed
+                    pointerY>size.height-edge -> ((pointerY-(size.height-edge))/edge).coerceIn(0f,1f)*speed
+                    else -> 0f
+                }
+                if(autoScroll==0f) stopAutoScroll()
+                else if(autoScrollJob?.isActive!=true) autoScrollJob=launch {
+                    while(isActive && autoScroll!=0f) {
+                        state.scrollBy(autoScroll)
+                        itemAt(pointerY)?.let { extend(it.key) }
+                        delay(16)
+                    }
+                }
+            },
+            onDragEnd={ stopAutoScroll() },
+            onDragCancel={ stopAutoScroll() }
+        )
+    }
 }
 
 @Composable fun CollectionPage(title: String,media: List<LocalMedia>,subtitle: String,favorites: Set<String>,back: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,toggle: (LocalMedia)->Unit,folders: List<MediaFolder>,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit,isFolder: Boolean=false,initialFilter: Int=0) {
@@ -234,7 +265,7 @@ private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia
         if(isFolder) item { LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { items(listOf("Tudo","Áudios","Vídeos")) { label -> val index=listOf("Tudo","Áudios","Vídeos").indexOf(label); FilterChip(filter==index,{ filter=index },label={ Text(label,maxLines=1) }) } } }
         item { MediaSelectionBar(selecting,selected,visible,folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=visible.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move) }
         if(visible.isEmpty()) item { EmptyContent("Coleção indisponível","Os arquivos podem ter sido movidos, excluídos ou não correspondem ao filtro.") }
-        items(visible,key={ it.key }) { m -> Box(Modifier.padding(horizontal=20.dp)) { MediaRow(m,m.key in favorites,{ play(m,visible) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) } }
+        items(visible,key={ it.key }) { m -> Box(Modifier.padding(horizontal=20.dp)) { MediaRow(m,m.key in favorites,{ play(m,visible) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) } }
     }
 }
 @Composable fun PlaylistsPage(collections: List<PlaylistDetail>,create: ()->Unit,open: (Long)->Unit) {
