@@ -26,23 +26,18 @@ data class PlaylistDetail(val playlist: PlaylistEntity, val items: List<LocalMed
 class LibraryViewModel(private val app: AppContainer) : ViewModel() {
     private val dao = app.database.libraryDao()
     private val content = MutableStateFlow(LibraryState())
-    private val sorts = MutableStateFlow(mapOf(
-        LibrarySection.MUSIC to MediaSort.TITLE,
-        LibrarySection.WHATSAPP_AUDIO to MediaSort.DATE_ADDED,
-        LibrarySection.VIDEO to MediaSort.DATE_ADDED
-    ))
     private var refreshJob: Job? = null
     private val notices = Channel<String>(Channel.BUFFERED)
     val messages = notices.receiveAsFlow()
     private val pendingFileOperations=Channel<MediaFileOperation>(Channel.BUFFERED)
     val fileOperations=pendingFileOperations.receiveAsFlow()
     val settings = app.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
-    val state = combine(content,settings,sorts) { library,preferences,currentSorts ->
+    val state = combine(content,settings) { library,preferences ->
         val visibleAudio=library.songs.filter { !preferences.hideShort || it.durationMs>=10_000 }
-        val music=visibleAudio.filterNot { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.MUSIC))
-        val whatsapp=visibleAudio.filter { it.isWhatsAppAudio() }.sortedMedia(currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO))
-        val video=library.videos.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(currentSorts.getValue(LibrarySection.VIDEO))
-        library.copy(songs=music,whatsAppAudio=whatsapp,videos=video,folders=app.mediaRepository.foldersFrom(music+whatsapp+video,preferences.folderSort),songSort=currentSorts.getValue(LibrarySection.MUSIC),whatsAppSort=currentSorts.getValue(LibrarySection.WHATSAPP_AUDIO),videoSort=currentSorts.getValue(LibrarySection.VIDEO))
+        val music=visibleAudio.filterNot { it.isWhatsAppAudio() }.sortedMedia(preferences.musicSort)
+        val whatsapp=visibleAudio.filter { it.isWhatsAppAudio() }.sortedMedia(preferences.whatsAppSort)
+        val video=library.videos.filter { !preferences.hideShort || it.durationMs>=10_000 }.sortedMedia(preferences.videoSort)
+        library.copy(songs=music,whatsAppAudio=whatsapp,videos=video,folders=app.mediaRepository.foldersFrom(music+whatsapp+video,preferences.folderSort),songSort=preferences.musicSort,whatsAppSort=preferences.whatsAppSort,videoSort=preferences.videoSort)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),LibraryState())
     val favorites=dao.favorites().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
     val playlists=dao.playlists().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5000),emptyList())
@@ -71,7 +66,8 @@ class LibraryViewModel(private val app: AppContainer) : ViewModel() {
             catch(e: Exception) { content.value=content.value.copy(loading=false,error="Não foi possível ler os arquivos. Confira o acesso à biblioteca.") }
         }
     }
-    fun order(section: LibrarySection,value: MediaSort) { sorts.update { it + (section to value) } }
+    fun order(section: LibrarySection,value: MediaSort) = action { app.settings.setMediaSort(section,value) }
+    fun setMusicTab(value: Int) = action { app.settings.setMusicTab(value) }
     fun setFolderFilter(value: FolderFilter) = action { app.settings.setFolderFilter(value) }
     fun setFolderSort(value: FolderSort) = action { app.settings.setFolderSort(value) }
     fun play(item: LocalMedia, source: List<LocalMedia>) = app.player.play(source,source.indexOf(item).coerceAtLeast(0))

@@ -1,6 +1,8 @@
 package com.localflow.player.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -61,9 +63,10 @@ import com.localflow.player.model.*
         Text(text,Modifier.padding(14.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-@Composable fun MediaRow(item: LocalMedia,favorite: Boolean=false,play: ()->Unit,add: ()->Unit,toggleFavorite: ()->Unit,selected: Boolean?=null,select: ()->Unit = {},remove: (() -> Unit)?=null) {
+@OptIn(ExperimentalFoundationApi::class)
+@Composable fun MediaRow(item: LocalMedia,favorite: Boolean=false,play: ()->Unit,add: ()->Unit,toggleFavorite: ()->Unit,selected: Boolean?=null,select: ()->Unit = {},remove: (() -> Unit)?=null,onLongSelect: (() -> Unit)?=null) {
     var menu by remember(item.key) { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().clickable(onClick=if(selected==null) play else select).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().combinedClickable(onClick=if(selected==null) play else select,onLongClick=onLongSelect).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
         if(selected!=null) Checkbox(selected,{ select() })
         MediaThumbnail(item,if(item.kind==MediaKind.VIDEO) Modifier.width(88.dp).height(58.dp) else Modifier.size(52.dp))
         Spacer(Modifier.width(12.dp))

@@ -118,7 +118,7 @@ import com.localflow.player.playback.PlayerConnection
             }) { padding ->
                 NavHost(nav,"home",Modifier.padding(padding)) {
                     composable("home") { HomePage(library,collections,favoriteKeys,player,::open,::play,{ adding=it },vm::toggleFavorite) }
-                    composable("songs") { SongsPage(library,favoriteKeys,vm,::group,{ open("search") },::play,::shuffle,{ adding=it },{ addingMany=it },vm::requestDelete,vm::requestMove) }
+                    composable("songs") { SongsPage(library,favoriteKeys,settings.musicTab,vm::setMusicTab,vm,::group,{ open("search") },::play,::shuffle,{ adding=it },{ addingMany=it },vm::requestDelete,vm::requestMove) }
                     composable("videos") { MediaListPage("Vídeos",library.videos,library.loading,favoriteKeys,{ open("search") },::play,{ adding=it },vm::toggleFavorite,library.folders,vm::requestDelete,vm::requestMove,sort=library.videoSort,order={ vm.order(LibrarySection.VIDEO,it) }) }
                     composable("folders") { FoldersPage(library.folders,settings.folderFilter,settings.folderSort,vm::setFolderFilter,vm::setFolderSort,::folder) }
                     composable("group/{type}/{id}?filter={filter}",arguments=listOf(navArgument("filter") { defaultValue=0 })) { e ->

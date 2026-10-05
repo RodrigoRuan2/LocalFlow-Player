@@ -83,8 +83,8 @@ import kotlinx.coroutines.withContext
     }
 }
 
-@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,shuffle: (List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,addSelected: (List<LocalMedia>)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+@Composable fun SongsPage(state: LibraryState,favorites: Set<String>,initialTab: Int,setTab: (Int)->Unit,vm: LibraryViewModel,group: (String,String)->Unit,search: ()->Unit,play: (LocalMedia,List<LocalMedia>)->Unit,shuffle: (List<LocalMedia>)->Unit,add: (LocalMedia)->Unit,addSelected: (List<LocalMedia>)->Unit,delete: (List<LocalMedia>)->Unit,move: (List<LocalMedia>,String)->Unit) {
+    var tab by rememberSaveable { mutableIntStateOf(initialTab) }
     var sortMenu by remember { mutableStateOf(false) }
     var selecting by rememberSaveable(tab) { mutableStateOf(false) }
     var selectedKeys by rememberSaveable(tab) { mutableStateOf(listOf<String>()) }
@@ -94,12 +94,12 @@ import kotlinx.coroutines.withContext
     val section=if(tab==1) LibrarySection.WHATSAPP_AUDIO else LibrarySection.MUSIC
     val shown=if(tab==1) state.whatsAppAudio else state.songs
     val selected=remember(shown,selectedKeys) { shown.filter { it.key in selectedKeys } }
+    LaunchedEffect(initialTab) { tab=initialTab }
     LaunchedEffect(tab,selectedSort) { listState.scrollToItem(0) }
     Column {
         PageHeader("Músicas",(state.songs.size+state.whatsAppAudio.size).toString()+" áudios no aparelho",actions={
             if(tab<2) {
                 IconButton({ shuffle(shown) },enabled=shown.isNotEmpty()) { Icon(Icons.Default.Shuffle,"Tocar em aleatório") }
-                IconButton({ selecting=true }) { Icon(Icons.Default.SelectAll,"Selecionar arquivos") }
             }
             IconButton(search) { Icon(Icons.Default.Search,"Pesquisar") }
         })
@@ -107,7 +107,7 @@ import kotlinx.coroutines.withContext
         LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
                 items(listOf("Faixas","WhatsApp","Álbuns","Artistas")) { label ->
                     val index=listOf("Faixas","WhatsApp","Álbuns","Artistas").indexOf(label)
-                    FilterChip(tab==index,{ tab=index },label={ Text(label,maxLines=1) })
+                    FilterChip(tab==index,{ tab=index; setTab(index) },label={ Text(label,maxLines=1) })
                 }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -120,12 +120,12 @@ import kotlinx.coroutines.withContext
             }
         }
         if(state.loading) Box(Modifier.fillMaxSize(),Alignment.Center) { CircularProgressIndicator() }
-        else LazyColumn(state=listState,modifier=if(tab<2) Modifier.dragSelectMedia(listState,shown,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }) else Modifier,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
+        else LazyColumn(state=listState,modifier=if(tab<2) Modifier.dragSelectMedia(listState,shown,0,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }) else Modifier,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
             if(shown.isEmpty() && tab<2) item { EmptyContent(if(tab==1) "Nenhum áudio do WhatsApp encontrado" else "Nenhuma música encontrada",if(tab==1) "Os áudios em pastas do WhatsApp aparecem separados aqui." else "Confira a permissão para músicas e os arquivos salvos no aparelho.") }
             if(tab==0) {
-                items(state.songs,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.songs) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
+                items(state.songs,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.songs) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
             } else if(tab==1) {
-                items(state.whatsAppAudio,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.whatsAppAudio) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
+                items(state.whatsAppAudio,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,state.whatsAppAudio) },{ add(m) },{ vm.toggleFavorite(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
             } else {
                 items(grouped.entries.toList(),key={ it.key }) { (key,media) ->
                     Row(Modifier.fillMaxWidth().clickable { group(if(tab==2) "album" else "artist",key) }.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -157,14 +157,13 @@ private fun sortMenuLabel(value: MediaSort): String = when(value) { MediaSort.TI
         PageHeader(title,media.size.toString()+" arquivos locais",back,actions={
             IconButton(search) { Icon(Icons.Default.Search,"Pesquisar") }
             if(sort!=null) Box { IconButton({ sortMenu=true }) { Icon(Icons.Default.Sort,"Ordenar: "+sortLabel(sort)) }; DropdownMenu(sortMenu,{ sortMenu=false }) { MediaSort.entries.forEach { value -> DropdownMenuItem(text={ Text(sortMenuLabel(value)) },onClick={ sortMenu=false; order(value) }) } } }
-            IconButton({ selecting=true }) { Icon(Icons.Default.SelectAll,"Selecionar arquivos") }
         })
         MediaSelectionBar(selecting,selected,items,folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=items.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move)
         if(title=="Favoritos") Row(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("Tudo","Músicas","Vídeos").forEachIndexed { i,s -> FilterChip(kind==i,{ kind=i },label={ Text(s) }) } }
         if(loading) Box(Modifier.fillMaxSize(),Alignment.Center) { CircularProgressIndicator() }
-        else LazyColumn(state=listState,contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
+        else LazyColumn(state=listState,modifier=Modifier.dragSelectMedia(listState,items,0,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }),contentPadding=PaddingValues(horizontal=20.dp,vertical=8.dp)) {
             if(items.isEmpty()) item { EmptyContent(if(title=="Favoritos") "Seus favoritos aparecem aqui" else "Nenhum vídeo encontrado",if(title=="Favoritos") "Use o menu de uma música ou vídeo para favoritar." else "Confira o acesso a vídeos nas configurações.") }
-            items(items,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,items) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) }
+            items(items,key={ it.key }) { m -> MediaRow(m,m.key in favorites,{ play(m,items) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) }
         }
     }
 }
@@ -208,8 +207,8 @@ private fun folderBreakdown(folder: MediaFolder): String = listOfNotNull(
 ).joinToString(" · ").ifBlank { "outros" }
 
 /** A long press starts selection; dragging over visible rows adds each one without reopening menus. */
-private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia>,start: (String)->Unit,extend: (String)->Unit): Modifier = pointerInput(media) {
-    fun itemAt(y: Float): LocalMedia? = state.layoutInfo.visibleItemsInfo.firstOrNull { info -> y>=info.offset && y<info.offset+info.size }?.let { media.getOrNull(it.index) }
+private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia>,firstMediaItemIndex: Int,start: (String)->Unit,extend: (String)->Unit): Modifier = pointerInput(media,firstMediaItemIndex) {
+    fun itemAt(y: Float): LocalMedia? = state.layoutInfo.visibleItemsInfo.firstOrNull { info -> y>=info.offset && y<info.offset+info.size }?.let { media.getOrNull(it.index-firstMediaItemIndex) }
     detectDragGesturesAfterLongPress(
         onDragStart={ point -> itemAt(point.y)?.let { start(it.key) } },
         onDrag={ change,_ -> itemAt(change.position.y)?.let { extend(it.key) } }
@@ -224,7 +223,9 @@ private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia
     val visible=remember(media,filter,isFolder) { if(!isFolder) media else when(filter) { 1->media.filter { it.kind==MediaKind.AUDIO }; 2->media.filter { it.kind==MediaKind.VIDEO }; else->media } }
     val selected=remember(visible,selectedKeys) { visible.filter { it.key in selectedKeys } }
     LaunchedEffect(filter) { listState.scrollToItem(0) }
-    LazyColumn(state=listState,contentPadding=PaddingValues(bottom=16.dp)) {
+    // Header, overview and the selection bar occupy list slots; folders have one extra filter row.
+    val firstMediaItemIndex=if(isFolder) 4 else 3
+    LazyColumn(state=listState,modifier=Modifier.dragSelectMedia(listState,visible,firstMediaItemIndex,{ key -> selecting=true; selectedKeys=listOf(key) },{ key -> if(key !in selectedKeys) selectedKeys=selectedKeys+key }),contentPadding=PaddingValues(bottom=16.dp)) {
         item { PageHeader(title,subtitle,back) }
         item { Row(Modifier.padding(20.dp),verticalAlignment=Alignment.CenterVertically) {
             MediaThumbnail(media.firstOrNull(),Modifier.size(116.dp),large=true); Spacer(Modifier.width(18.dp))
@@ -232,9 +233,8 @@ private fun Modifier.dragSelectMedia(state: LazyListState,media: List<LocalMedia
         } }
         if(isFolder) item { LazyRow(contentPadding=PaddingValues(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { items(listOf("Tudo","Áudios","Vídeos")) { label -> val index=listOf("Tudo","Áudios","Vídeos").indexOf(label); FilterChip(filter==index,{ filter=index },label={ Text(label,maxLines=1) }) } } }
         item { MediaSelectionBar(selecting,selected,visible,folders.map { it.name.substringAfterLast('/') }.distinct(),{ selectedKeys=visible.map { it.key } },{ selecting=false; selectedKeys=emptyList() },delete,move) }
-        item { if(!selecting) TextButton({ selecting=true },Modifier.padding(horizontal=12.dp)) { Icon(Icons.Default.SelectAll,null); Text("Selecionar arquivos") } }
         if(visible.isEmpty()) item { EmptyContent("Coleção indisponível","Os arquivos podem ter sido movidos, excluídos ou não correspondem ao filtro.") }
-        items(visible,key={ it.key }) { m -> Box(Modifier.padding(horizontal=20.dp)) { MediaRow(m,m.key in favorites,{ play(m,visible) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key }) } }
+        items(visible,key={ it.key }) { m -> Box(Modifier.padding(horizontal=20.dp)) { MediaRow(m,m.key in favorites,{ play(m,visible) },{ add(m) },{ toggle(m) },selected=if(selecting) m.key in selectedKeys else null,select={ selectedKeys=if(m.key in selectedKeys) selectedKeys-m.key else selectedKeys+m.key },onLongSelect={ selecting=true; selectedKeys=listOf(m.key) }) } }
     }
 }
 @Composable fun PlaylistsPage(collections: List<PlaylistDetail>,create: ()->Unit,open: (Long)->Unit) {

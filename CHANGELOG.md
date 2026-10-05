@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## v0.4.1-beta — Seleção e filtros persistentes
+
+- A seleção em lote não exige mais tocar em **Selecionar arquivos**: segure uma mídia e deslize por outras faixas ou vídeos visíveis, como em uma galeria Android.
+- A rolagem comum permanece nativa e fluida; o gesto de seleção só é capturado depois do toque longo.
+- A aba aberta em Músicas e as ordenações de Faixas, WhatsApp e Vídeos passam a ser persistidas com DataStore, junto com as preferências já existentes de Pastas.
+
 ## v0.4.0-beta — Favoritos e organização fluida
 
 - A notificação e os controles de mídia do sistema passam a oferecer **Adicionar aos favoritos**; ao tocar, a ação é persistida no mesmo banco do app e alterna para remover.
